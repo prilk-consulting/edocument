@@ -1,0 +1,121 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-11-08 06:54:38.804475",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "identifier_value",
+  "identifier_element_name",
+  "identifier_namespace",
+  "sales_invoice_settings_section",
+  "validate_sales_invoice_on_save",
+  "validate_sales_invoice_on_submit",
+  "column_break_pbbd",
+  "action_on_validation_error_during_save",
+  "action_on_validation_error_during_submit",
+  "schema_files_section",
+  "generator_path",
+  "validator_path",
+  "parser_path"
+ ],
+ "fields": [
+  {
+   "description": "The value found in the XML identifier element that uniquely identifies this profile. For PEPPOL: CustomizationID value (e.g., urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0). For CII/Factur-X: Guideline Parameter ID value (e.g., urn:cen.eu:en16931:2017#compliant#urn:factur-x.eu:1p0:basic).",
+   "fieldname": "identifier_value",
+   "fieldtype": "Data",
+   "label": "Identifier Value"
+  },
+  {
+   "description": "Name of the XML element that contains the profile identifier (e.g., CustomizationID, ProfileID, GuidelineParameter).",
+   "fieldname": "identifier_element_name",
+   "fieldtype": "Data",
+   "label": "Identifier Element Name"
+  },
+  {
+   "description": "Namespace URI where the identifier element is found (e.g., urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2).",
+   "fieldname": "identifier_namespace",
+   "fieldtype": "Data",
+   "label": "Identifier Namespace"
+  },
+  {
+   "default": "0",
+   "fieldname": "validate_sales_invoice_on_save",
+   "fieldtype": "Check",
+   "label": "Validate Sales Invoice on Save"
+  },
+  {
+   "default": "0",
+   "fieldname": "validate_sales_invoice_on_submit",
+   "fieldtype": "Check",
+   "label": "Validate Sales Invoice on Submit"
+  },
+  {
+   "default": "0",
+   "fieldname": "action_on_validation_error_during_save",
+   "fieldtype": "Check",
+   "label": "Action on Validation Error during Save"
+  },
+  {
+   "default": "0",
+   "fieldname": "action_on_validation_error_during_submit",
+   "fieldtype": "Check",
+   "label": "Action on Validation Error during Submit"
+  },
+  {
+   "fieldname": "sales_invoice_settings_section",
+   "fieldtype": "Section Break",
+   "label": "Sales Invoice Settings"
+  },
+  {
+   "fieldname": "column_break_pbbd",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "schema_files_section",
+   "fieldtype": "Section Break",
+   "label": "Schema files"
+  },
+  {
+   "fieldname": "generator_path",
+   "fieldtype": "Data",
+   "label": "Generator Path"
+  },
+  {
+   "fieldname": "validator_path",
+   "fieldtype": "Data",
+   "label": "Validator Path"
+  },
+  {
+   "fieldname": "parser_path",
+   "fieldtype": "Data",
+   "label": "Parser Path"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-11-17 05:42:33.029548",
+ "modified_by": "Administrator",
+ "module": "Edocument",
+ "name": "EDocument Profile",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -1,0 +1,154 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-11-08 07:21:23.153876",
+ "default_view": "List",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "general_section",
+  "edocument_profile",
+  "country",
+  "status",
+  "company",
+  "column_break_avdv",
+  "direction",
+  "edocument_reference_section",
+  "edocument_source_type",
+  "edocument_source_document",
+  "column_break_wixv",
+  "xml_file",
+  "edocument_target_type",
+  "edocument_target_document",
+  "error_section",
+  "error"
+ ],
+ "fields": [
+  {
+   "fieldname": "edocument_source_type",
+   "fieldtype": "Link",
+   "label": "EDocument Source Type",
+   "options": "DocType"
+  },
+  {
+   "fieldname": "edocument_source_document",
+   "fieldtype": "Dynamic Link",
+   "label": "EDocument Source Document",
+   "options": "edocument_source_type"
+  },
+  {
+   "fieldname": "edocument_profile",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "EDocument Profile",
+   "options": "EDocument Profile"
+  },
+  {
+   "default": "Outgoing",
+   "fieldname": "direction",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Direction",
+   "options": "\nIncoming\nOutgoing"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "\nValidation Successful\nValidation Failed\nTransmission Successful\nTransmission Failed"
+  },
+  {
+   "fieldname": "country",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Country",
+   "options": "Country"
+  },
+  {
+   "fieldname": "error",
+   "fieldtype": "Long Text",
+   "label": "Error",
+   "read_only": 1
+  },
+  {
+   "fieldname": "edocument_target_type",
+   "fieldtype": "Link",
+   "label": "EDocument Target Type",
+   "options": "DocType"
+  },
+  {
+   "fieldname": "edocument_target_document",
+   "fieldtype": "Dynamic Link",
+   "label": "EDocument Target Document",
+   "options": "edocument_target_type"
+  },
+  {
+   "description": "Upload the <code>.xml</code> file to import and create Edocument.",
+   "fieldname": "xml_file",
+   "fieldtype": "Attach",
+   "label": "XML File"
+  },
+  {
+   "fieldname": "general_section",
+   "fieldtype": "Section Break",
+   "label": "General Section"
+  },
+  {
+   "fieldname": "edocument_reference_section",
+   "fieldtype": "Section Break",
+   "label": "EDocument Reference"
+  },
+  {
+   "fieldname": "column_break_wixv",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "error_section",
+   "fieldtype": "Section Break",
+   "label": "Error"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Company",
+   "options": "Company"
+  },
+  {
+   "fieldname": "column_break_avdv",
+   "fieldtype": "Column Break"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-11-17 06:51:47.578264",
+ "modified_by": "Administrator",
+ "module": "Edocument",
+ "name": "EDocument",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

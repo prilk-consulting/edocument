@@ -86,7 +86,7 @@ app_license = "gpl-3.0"
 # ------------
 
 # before_install = "edocument.install.before_install"
-# after_install = "edocument.install.after_install"
+after_install = "edocument.install.after_install"
 
 # Uninstallation
 # ------------
@@ -132,13 +132,11 @@ app_license = "gpl-3.0"
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+doc_events = {
+	"Sales Invoice": {
+		"on_submit": "edocument.edocument.custom.sales_invoice.on_submit",
+	},
+}
 
 # Scheduled Tasks
 # ---------------

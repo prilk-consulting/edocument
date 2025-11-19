@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CodeList xmlns="urn:fdc:difi.no:2017:vefa:structure:CodeList-1">
+
+    <Title>Invoice type code (UNCL1001 subset)</Title>
+    <Identifier>UNCL1001-inv</Identifier>
+    <Version>D.16B</Version>
+    <Agency>UN/CEFACT</Agency>
+    <Subset>openPEPPOL</Subset>
+
+   
+     <Code>
+        <Id>71</Id>
+        <Name>Request for payment</Name>
+        <Description>Document/message issued by a creditor to a debtor to request payment of one or more invoices past due.</Description>
+    </Code>
+
+    <Code>
+        <Id>80</Id>
+        <Name>Debit note related to goods or services</Name>
+        <Description>Debit information related to a transaction for goods or
+            services to the relevant party.
+        </Description>
+    </Code>
+   
+    <Code>
+        <Id>82</Id>
+        <Name>Metered services invoice</Name>
+        <Description>Document/message claiming payment for the supply of
+            metered services (e.g., gas, electricity, etc.) supplied
+            to a fixed meter whose consumption is measured over a
+            period of time.
+        </Description>
+    </Code>
+   
+    <Code>
+        <Id>84</Id>
+        <Name>Debit note related to financial adjustments</Name>
+        <Description>Document/message for providing debit information related to financial adjustments to the relevant party.
+        </Description>
+    </Code>
+ 
+    <Code>
+        <Id>102</Id>
+        <Name>Tax notification</Name>
+        <Description>Used to specify that the message is a tax notification.</Description>
+    </Code>
+    
+    <Code>
+        <Id>218</Id>
+        <Name>Final payment request based on completion of work</Name>
+        <Description>The final payment request of a series of payment requests submitted upon completion of all the work.</Description>
+    </Code>
+
+    <Code>
+        <Id>219</Id>
+        <Name>Payment request for completed units</Name>
+        <Description> A request for payment for completed units.</Description>
+    </Code>
+    <!-- Germany only -->
+    <Code>
+        <Id>326</Id>
+        <Name>Partial invoice</Name>
+        <Description>Document/message specifying details of an incomplete invoice.</Description>
+    </Code>  
+    <Code>
+        <Id>331</Id>
+        <Name>Commercial invoice which includes a packing list</Name>
+        <Description>Commercial transaction (invoice) will include a packing list.</Description>
+    </Code>
+    
+    <Code>
+        <Id>380</Id>
+        <Name>Commercial invoice</Name>
+        <Description>(1334) Document/message claiming payment for goods or
+            services supplied under conditions agreed between seller
+            and buyer.
+        </Description>
+    </Code>
+  
+    <Code>
+        <Id>382</Id>
+        <Name>Commission note</Name>
+        <Description>Document/message in which a seller specifies the amount of commission, the percentage of the invoice amount, or some other basis for the calculation of the commission to which a sales agent is entitled.</Description>
+    </Code>
+    
+    <Code>
+        <Id>383</Id>
+        <Name>Debit note</Name>
+        <Description>Document/message for providing debit information to the
+            relevant party.
+        </Description>
+    </Code>
+    <!-- Germany only -->
+    <Code>
+        <Id>384</Id>
+        <Name>Corrected invoice</Name>
+        <Description>Commercial invoice that includes revised information differing from an earlier submission of the same invoice.</Description>
+    </Code> 
+    <Code>
+        <Id>386</Id>
+        <Name>Prepayment invoice</Name>
+        <Description>An invoice to pay amounts for goods and services in
+            advance; these amounts will be subtracted from the final
+            invoice.
+        </Description>
+    </Code>
+
+    <Code>
+        <Id>388</Id>
+        <Name>Tax invoice</Name>
+        <Description>An invoice for tax purposes.</Description>
+    </Code>
+    <!-- Germany only -->
+    <Code>
+        <Id>389</Id>
+        <Name>Self-billed invoice</Name>
+        <Description>An invoice the invoicee is producing instead of the seller.</Description>
+    </Code>
+
+    <Code>
+        <Id>393</Id>
+        <Name>Factored invoice</Name>
+        <Description>Invoice assigned to a third party for collection.</Description>
+    </Code>
+  
+    <Code>
+        <Id>395</Id>
+        <Name>Consignment invoice</Name>
+        <Description>Commercial invoice that covers a transaction other than
+            one involving a sale.
+        </Description>
+    </Code>
+
+    <Code>
+        <Id>553</Id>
+        <Name>Forwarder's invoice discrepancy report</Name>
+        <Description>Document/message reporting invoice discrepancies indentified by the forwarder.</Description>
+    </Code>
+
+    <Code>
+        <Id>575</Id>
+        <Name>Insurer's invoice</Name>
+        <Description>Document/message issued by an insurer specifying the
+            cost of an insurance which has been effected and
+            claiming payment therefore.
+        </Description>
+    </Code>
+  
+    <Code>
+        <Id>623</Id>
+        <Name>Forwarder's invoice</Name>
+        <Description>Invoice issued by a freight forwarder specifying
+            services rendered and costs incurred and claiming
+            payment therefore.
+        </Description>
+    </Code>
+    
+    <Code>
+        <Id>780</Id>
+        <Name>Freight invoice</Name>
+        <Description>Document/message issued by a transport operation
+            specifying freight costs and charges incurred for a
+            transport operation and stating conditions of payment.
+        </Description>
+    </Code>
+ 
+    <Code>
+        <Id>817</Id>
+        <Name>Claim notification</Name>
+        <Description>Document notifying a claim.</Description>
+    </Code>
+    
+    <Code>
+        <Id>870</Id>
+        <Name>Consular invoice</Name>
+        <Description>Document/message to be prepared by an exporter in his country and presented to a diplomatic representation of the importing country for endorsement and subsequently to be presented by the importer in connection with the import of the goods described therein.</Description>
+    </Code>
+
+    <Code>
+        <Id>875</Id>
+        <Name>Partial construction invoice</Name>
+        <Description>Partial invoice in the context of a specific construction project.</Description>
+    </Code>
+
+    <Code>
+        <Id>876</Id>
+        <Name>Partial final construction invoice</Name>
+        <Description>Invoice concluding all previous partial construction invoices of a completed partial rendered service in the context of a specific construction project.</Description>
+    </Code>
+    
+    <Code>
+        <Id>877</Id>
+        <Name>Final construction invoice</Name>
+        <Description>Invoice concluding all previous partial invoices and partial final construction invoices in the context of a specific construction project.</Description>
+    </Code>
+</CodeList>

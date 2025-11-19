@@ -1,0 +1,13 @@
+*.iml
+*.jar
+target
+*.html
+*.pdf
+*.epub
+tmp*
+*.db
+.idea
+/.settings/
+/.project
+vagrant/.vagrant/machines/dev/virtualbox/private_key
+*.xpr
