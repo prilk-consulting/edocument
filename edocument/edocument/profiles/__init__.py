@@ -6,7 +6,4 @@ Profiles module for EDocument.
 Import profile modules here to register them automatically.
 """
 
-# Example: To register a profile, import it here
-# import edocument.edocument.profiles.peppol  # This will register PEPPOL
-# import edocument.edocument.profiles.en16931  # This will register EN16931
 
