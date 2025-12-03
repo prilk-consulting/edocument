@@ -380,35 +380,26 @@ class PEPPOLGenerator:
         tax_amount.text = str(flt(self.invoice.total_taxes_and_charges, 2))
         tax_amount.set("currencyID", self.invoice.currency)
         
-        # Group taxes by rate and collect data
+        # Group taxes by rate from items
+        # Calculate taxes directly from items to ensure all tax rates are captured correctly
         tax_rates = {}
-        for tax in self.invoice.taxes:
-            # For credit notes, tax_amount can be negative, so check != 0 instead of > 0
-            if tax.charge_type != "Actual" and tax.tax_amount != 0:
-                rate = tax.rate or 0
-                if rate not in tax_rates:
-                    tax_rates[rate] = {
-                        'taxable_amount': 0,
-                        'tax_amount': 0
-                    }
-                
-                # Use tax_amount_after_discount_amount (ERPNext field that always contains the final tax amount)
-                final_tax_amount = getattr(tax, 'tax_amount_after_discount_amount', None) or tax.tax_amount
-                tax_rates[rate]['tax_amount'] += final_tax_amount
-                
-                # Calculate taxable amount (after discount)
-                if len(self.invoice.taxes) == 1:
-                    # Single tax: use invoice.net_total directly
-                    tax_rates[rate]['taxable_amount'] += self.invoice.net_total
-                elif hasattr(tax, "net_amount") and tax.net_amount:
-                    tax_rates[rate]['taxable_amount'] += tax.net_amount
-                elif hasattr(tax, "custom_net_amount") and tax.custom_net_amount:
-                    tax_rates[rate]['taxable_amount'] += tax.custom_net_amount
-                elif final_tax_amount and rate:
-                    # Calculate taxable amount from final tax amount
-                    tax_rates[rate]['taxable_amount'] += round(final_tax_amount / rate * 100, 2)
-                else:
-                    tax_rates[rate]['taxable_amount'] += 0
+        for item in self.invoice.items:
+            rate = self._get_item_tax_rate(item)
+            
+            if not rate or rate == 0:
+                continue
+            
+            if rate not in tax_rates:
+                tax_rates[rate] = {
+                    'taxable_amount': 0,
+                    'tax_amount': 0
+                }
+            
+            # Calculate tax amount for this item
+            # item.net_amount is already after item-level discounts
+            item_tax_amount = flt(item.net_amount) * rate / 100
+            tax_rates[rate]['tax_amount'] += item_tax_amount
+            tax_rates[rate]['taxable_amount'] += flt(item.net_amount)
         
         # Add TaxSubtotal for each rate
         for rate, data in tax_rates.items():
