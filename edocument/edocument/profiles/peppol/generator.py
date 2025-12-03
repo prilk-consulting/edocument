@@ -458,14 +458,31 @@ class PEPPOLGenerator:
         payment_id.text = self.invoice.name
         
         # Payee Financial Account
-        # Get bank details from payment_schedule
-        modes_of_payment = {ps.mode_of_payment for ps in self.invoice.payment_schedule if ps.mode_of_payment}
-        for mode_of_payment in modes_of_payment:
-            iban, bic = self._get_bank_details(mode_of_payment, self.invoice.company)
-            if not iban:
-                continue  # Skip if no IBAN found, try next mode_of_payment
-            
-            # IBAN found - add PayeeFinancialAccount
+        # BR-61: Required for PaymentMeansCode 30 (SEPA), 58 (Local), 59 (Non-SEPA international)
+        iban = None
+        bic = None
+        
+        if self.document_type == 'Invoice':
+            # For Invoices: Get bank details from payment_schedule mode_of_payment
+            modes_of_payment = {ps.mode_of_payment for ps in self.invoice.payment_schedule if ps.mode_of_payment}
+            for mode_of_payment in modes_of_payment:
+                iban, bic = self._get_bank_details(mode_of_payment, self.invoice.company)
+                if iban:
+                    break  # Use first valid bank account found
+        elif self.document_type == 'CreditNote':
+            # For Credit Notes: Get default company bank account
+            default_bank_account = frappe.db.get_value(
+                "Bank Account",
+                {"company": self.invoice.company, "is_company_account": 1, "is_default": 1, "disabled": 0},
+                "name"
+            )
+            if default_bank_account:
+                iban, bank = frappe.db.get_value("Bank Account", default_bank_account, ["iban", "bank"])
+                if iban:
+                    bic = frappe.db.get_value("Bank", bank, "swift_number") if bank else None
+        
+        # Add PayeeFinancialAccount if IBAN is found
+        if iban:
             payee_financial_account = ET.SubElement(payment_means, f"{{{self.namespaces['cac']}}}PayeeFinancialAccount")
             
             # PayeeFinancialAccount ID: Use IBAN
@@ -477,8 +494,6 @@ class PEPPOLGenerator:
                 financial_institution_branch = ET.SubElement(payee_financial_account, f"{{{self.namespaces['cac']}}}FinancialInstitutionBranch")
                 financial_institution_branch_id = ET.SubElement(financial_institution_branch, f"{{{self.namespaces['cbc']}}}ID")
                 financial_institution_branch_id.text = bic
-            
-            break  # Use first valid bank account found
     
     def _get_bank_details(self, mode_of_payment: str, company: str) -> tuple[str | None, str | None]:
         """
@@ -665,15 +680,10 @@ class PEPPOLGenerator:
         
         # Payable Amount (BT-112) - Amount due for payment
         # For credit notes, this should be negative (amount to be credited)
-        # For debit notes, this should be positive (amount to be debited)
         payable_amount = ET.SubElement(legal_total, f"{{{self.namespaces['cbc']}}}PayableAmount")
         if self.document_type == 'CreditNote':
             # For credit notes, PayableAmount should be negative (the amount to be credited)
             # Use grand_total (which is already negative for credit notes)
-            payable_value = flt(self.invoice.grand_total, 2)
-        elif self.document_type == 'DebitNote':
-            # For debit notes, PayableAmount should be positive (the amount to be debited)
-            # Use grand_total (which should be positive for debit notes)
             payable_value = flt(self.invoice.grand_total, 2)
         else:
             # For invoices, use outstanding_amount
