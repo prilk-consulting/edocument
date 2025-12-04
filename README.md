@@ -90,6 +90,92 @@ Then, you can map a **Common Code** from **Code List** "UNTDID.4461", e.g. "Cred
 
 Please note that the e-document standard only supports one payment means per invoice, so you should not specify multiple **Modes of Payment** in the same invoice.
 
+## How to Guide
+
+### Master Data Configuration
+
+#### Company Setup
+![Company EDocument Configuration](img/Company.png)
+
+Configure EDocument settings in the **Company** master data:
+- **EDocument Profile**: Default profile to use for this company
+- **Electronic Address Scheme**: Scheme for the company's electronic address (e.g., GLN, EAS)
+- **Electronic Address**: The company's electronic address identifier
+
+#### Customer Setup
+![Customer EDocument Configuration](img/Customer.png)
+
+Configure EDocument settings in the **Customer** master data:
+- **EDocument Profile**: Default profile to use for this customer
+- **Electronic Address Scheme**: Scheme for the customer's electronic address
+- **Electronic Address**: The customer's electronic address identifier
+
+#### Supplier Setup
+![Supplier EDocument Configuration](img/Supplier.png)
+
+Configure EDocument settings in the **Supplier** master data:
+- **EDocument Profile**: Default profile to use for this supplier
+- **Electronic Address Scheme**: Scheme for the supplier's electronic address
+- **Electronic Address**: The supplier's electronic address identifier
+
+### EDocument Profile
+
+![PEPPOL Profile Configuration](img/Peppol%20profile.png)
+
+The **EDocument Profile** defines the configuration for a specific e-document standard (e.g., PEPPOL). It includes:
+- **Identifier Values**: Used to detect the profile from XML (namespace, element name, value)
+- **Generator Path**: Function that generates XML from ERPNext documents
+- **Parser Path**: Function that parses XML into ERPNext documents
+- **Validator Path**: Function that validates XML against schemas and business rules
+- **Sales Invoice Settings**: Options for automatic validation on save/submit
+
+The PEPPOL profile is automatically created when you install the app.
+
+### Sales Invoice
+
+![Sales Invoice with EDocument Profile](img/Sales%20Invoice.png)
+
+In the **Sales Invoice**, you can:
+- Select an **EDocument Profile** (defaults from Customer if set)
+- When the invoice is submitted, an EDocument record is automatically created (if profile is set)
+- The EDocument can then be used to generate and validate the PEPPOL XML
+
+### Outgoing EDocument
+
+![Outgoing EDocument](img/Edocument%20Outgoing.png)
+
+For **outgoing** e-documents (generated from Sales Invoices):
+1. Set the **Source Type** (e.g., "Sales Invoice")
+2. Set the **Source Document** (the Sales Invoice name)
+3. Select the **EDocument Profile** (e.g., "PEPPOL")
+4. Click **Generate XML** to create the PEPPOL XML
+5. The XML is automatically validated
+6. The XML file is attached to the EDocument record
+
+### Incoming EDocument
+
+![Incoming EDocument](img/Edocument%20Incoming.png)
+
+For **incoming** e-documents (imported XML files):
+1. Upload the XML file
+2. The app automatically detects the document type and profile
+3. The XML is validated against XSD and Schematron rules
+4. Click **Create Document** to parse the XML and create a Purchase Invoice
+
+### Validation Errors
+
+![EDocument Validation Error](img/Edocument%20Validation%20Error.png)
+
+When validation fails, the **EDocument** record shows:
+- **Status**: "Validation Failed"
+- **Error**: Detailed validation error messages
+- **Warnings**: Any validation warnings (non-blocking)
+
+Common validation errors include:
+- XSD schema violations (element order, missing required fields)
+- Schematron business rule violations (BR-CO-15, BR-CO-17, etc.)
+- Missing required codes or invalid code values
+
 ## Usage
 
 ### EDocument Profile
