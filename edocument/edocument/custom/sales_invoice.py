@@ -6,16 +6,16 @@ from frappe import _
 
 
 def on_submit(doc, method):
-	"""Create an EDocument record when Sales Invoice is submitted."""
+	"""Create an EDocument record when document is submitted."""
 	# Only create EDocument if edocument_profile is set
 	if not doc.edocument_profile:
 		return
 
-	# Check if EDocument already exists for this Sales Invoice
+	# Check if EDocument already exists for this document
 	existing_edocument = frappe.db.exists(
 		"EDocument",
 		{
-			"edocument_source_type": "Sales Invoice",
+			"edocument_source_type": doc.doctype,
 			"edocument_source_document": doc.name,
 		},
 	)
@@ -32,7 +32,7 @@ def on_submit(doc, method):
 	edocument = frappe.get_doc(
 		{
 			"doctype": "EDocument",
-			"edocument_source_type": "Sales Invoice",
+			"edocument_source_type": doc.doctype,
 			"edocument_source_document": doc.name,
 			"edocument_profile": doc.edocument_profile,
 			"country": country,
