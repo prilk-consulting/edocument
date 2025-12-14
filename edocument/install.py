@@ -118,29 +118,31 @@ def get_custom_fields():
 def create_peppol_profile():
 	"""Create PEPPOL EDocument Profile on installation."""
 	import frappe
-	
+
 	profile_name = "PEPPOL"
-	
+
 	# Check if profile already exists
 	if frappe.db.exists("EDocument Profile", profile_name):
 		return
-	
+
 	try:
-		profile = frappe.get_doc({
-			"doctype": "EDocument Profile",
-			"name": profile_name,
-			"identifier_namespace": "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2",
-			"identifier_element_name": "CustomizationID",
-			"identifier_value": "urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0",
-			"generator_path": "edocument.edocument.profiles.peppol.generator.generate_peppol_xml",
-			"parser_path": "edocument.edocument.profiles.peppol.parser.parse_peppol_xml",
-			"validator_path": "edocument.edocument.profiles.peppol.validator.validate_peppol_xml",
-			"validate_sales_invoice_on_save": 0,
-			"validate_sales_invoice_on_submit": 0,
-			"action_on_validation_error_during_save": 0,
-			"action_on_validation_error_during_submit": 0,
-		})
+		profile = frappe.get_doc(
+			{
+				"doctype": "EDocument Profile",
+				"name": profile_name,
+				"identifier_namespace": "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2",
+				"identifier_element_name": "CustomizationID",
+				"identifier_value": "urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0",
+				"generator_path": "edocument.edocument.profiles.peppol.generator.generate_peppol_xml",
+				"parser_path": "edocument.edocument.profiles.peppol.parser.parse_peppol_xml",
+				"validator_path": "edocument.edocument.profiles.peppol.validator.validate_peppol_xml",
+				"validate_sales_invoice_on_save": 0,
+				"validate_sales_invoice_on_submit": 0,
+				"action_on_validation_error_during_save": 0,
+				"action_on_validation_error_during_submit": 0,
+			}
+		)
 		profile.insert(ignore_permissions=True)
 		frappe.db.commit()
 	except Exception as e:
-		frappe.log_error(f"Error creating PEPPOL profile: {str(e)}", "EDocument Installation")
+		frappe.log_error(f"Error creating PEPPOL profile: {e!s}", "EDocument Installation")

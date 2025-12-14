@@ -39,12 +39,9 @@ def on_submit(doc, method):
 		}
 	)
 	edocument.insert(ignore_permissions=True)
-	
+
 	frappe.msgprint(
-		_("EDocument {0} created successfully").format(
-			frappe.bold(edocument.name)
-		),
+		_("EDocument {0} created successfully").format(frappe.bold(edocument.name)),
 		indicator="green",
 		alert=True,
 	)
-

@@ -62,4 +62,3 @@ except ImportError:
 
 		def get_default_code(self) -> str | None:
 			return self.default_code
-

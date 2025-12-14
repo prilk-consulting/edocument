@@ -7,8 +7,9 @@ between ERPNext objects and PEPPOL codes.
 
 """
 
-import frappe
 from pathlib import Path
+
+import frappe
 from lxml import etree
 
 
@@ -50,49 +51,39 @@ def import_peppol_code_lists():
 				("Item Tax Template", "item_tax_template"),
 				("Account", "income_account"),
 				("Tax Category", "tax_category"),
-				("Sales Taxes and Charges Template", "taxes_and_charges")
-			]
+				("Sales Taxes and Charges Template", "taxes_and_charges"),
+			],
 		},
 		"urn:peppol:id:codelist:UNECERec20": {
 			"title": "Recommendation 20, including Recommendation 21 codes (UN/ECE)",
 			"xml_file": "UNECERec20-11e.xml",
 			"default_code": "C62",  # Piece
-			"doctype_mappings": [
-				("UOM", "uom")
-			]
+			"doctype_mappings": [("UOM", "uom")],
 		},
 		"urn:peppol:id:codelist:UNCL4461": {
 			"title": "Payment means code (UNCL4461)",
 			"xml_file": "UNCL4461.xml",
 			"default_code": "30",  # Credit transfer (most common)
-			"doctype_mappings": [
-				("Mode of Payment", "mode_of_payment")
-			]
+			"doctype_mappings": [("Mode of Payment", "mode_of_payment")],
 		},
 		"urn:peppol:id:codelist:ISO3166-1_Alpha2": {
 			"title": "Country codes (ISO 3166-1 alpha-2)",
 			"xml_file": "ISO3166-1_Alpha2.xml",
 			"default_code": "DE",  # Germany (common in EU)
-			"doctype_mappings": [
-				("Country", "country")
-			]
+			"doctype_mappings": [("Country", "country")],
 		},
 		"urn:peppol:id:codelist:ISO4217": {
 			"title": "Currency codes (ISO 4217)",
 			"xml_file": "ISO4217_2015.xml",
 			"default_code": "EUR",  # Euro (common in EU)
-			"doctype_mappings": [
-				("Currency", "currency")
-			]
+			"doctype_mappings": [("Currency", "currency")],
 		},
 		"urn:peppol:id:codelist:eas": {
 			"title": "Electronic Address Scheme (EAS)",
 			"xml_file": "eas.xml",
 			"default_code": "EM",  # Email (most common)
-			"doctype_mappings": [
-				("Electronic Address Scheme", "electronic_address_scheme")
-			]
-		}
+			"doctype_mappings": [("Electronic Address Scheme", "electronic_address_scheme")],
+		},
 	}
 
 	codelist_dir = Path(__file__).parent / "peppol-bis-invoice-3" / "structure" / "codelist"
@@ -126,8 +117,9 @@ def import_peppol_code_lists():
 			frappe.logger().info(f"Successfully imported code list: {canonical_uri}")
 
 		except Exception as e:
-			frappe.logger().error(f"Failed to import code list {canonical_uri}: {str(e)}")
+			frappe.logger().error(f"Failed to import code list {canonical_uri}: {e!s}")
 			import traceback
+
 			frappe.logger().error(traceback.format_exc())
 
 
@@ -163,7 +155,7 @@ def create_or_update_code_list(canonical_uri, config, xml_file_path):
 		return code_list_name
 
 	except Exception as e:
-		frappe.logger().error(f"Failed to create/update code list {canonical_uri}: {str(e)}")
+		frappe.logger().error(f"Failed to create/update code list {canonical_uri}: {e!s}")
 		return None
 
 
@@ -177,9 +169,9 @@ def import_codes_from_xml(code_list_name, xml_file_path, doctype_mappings):
 		root = tree.getroot()
 
 		# Handle namespace - PEPPOL XML uses default namespace
-		if root.tag.startswith('{'):
+		if root.tag.startswith("{"):
 			# XML has default namespace - use full namespace URI
-			ns_uri = 'urn:fdc:difi.no:2017:vefa:structure:CodeList-1'
+			ns_uri = "urn:fdc:difi.no:2017:vefa:structure:CodeList-1"
 			codes = root.findall(f".//{{{ns_uri}}}Code")
 		else:
 			# XML without namespace
@@ -191,15 +183,29 @@ def import_codes_from_xml(code_list_name, xml_file_path, doctype_mappings):
 
 		for code_elem in codes:
 			# Handle namespace for child elements
-			if root.tag.startswith('{'):
-				ns_uri = 'urn:fdc:difi.no:2017:vefa:structure:CodeList-1'
-				code_id = code_elem.find(f"{{{ns_uri}}}Id").text if code_elem.find(f"{{{ns_uri}}}Id") is not None else None
-				code_name = code_elem.find(f"{{{ns_uri}}}Name").text if code_elem.find(f"{{{ns_uri}}}Name") is not None else ""
-				code_desc = code_elem.find(f"{{{ns_uri}}}Description").text if code_elem.find(f"{{{ns_uri}}}Description") is not None else ""
+			if root.tag.startswith("{"):
+				ns_uri = "urn:fdc:difi.no:2017:vefa:structure:CodeList-1"
+				code_id = (
+					code_elem.find(f"{{{ns_uri}}}Id").text
+					if code_elem.find(f"{{{ns_uri}}}Id") is not None
+					else None
+				)
+				code_name = (
+					code_elem.find(f"{{{ns_uri}}}Name").text
+					if code_elem.find(f"{{{ns_uri}}}Name") is not None
+					else ""
+				)
+				code_desc = (
+					code_elem.find(f"{{{ns_uri}}}Description").text
+					if code_elem.find(f"{{{ns_uri}}}Description") is not None
+					else ""
+				)
 			else:
 				code_id = code_elem.find("Id").text if code_elem.find("Id") is not None else None
 				code_name = code_elem.find("Name").text if code_elem.find("Name") is not None else ""
-				code_desc = code_elem.find("Description").text if code_elem.find("Description") is not None else ""
+				code_desc = (
+					code_elem.find("Description").text if code_elem.find("Description") is not None else ""
+				)
 
 			if not code_id:
 				continue
@@ -229,8 +235,9 @@ def import_codes_from_xml(code_list_name, xml_file_path, doctype_mappings):
 				imported_count += 1
 
 			except Exception as e:
-				frappe.logger().error(f"Failed to save common code {common_code_name}: {str(e)}")
+				frappe.logger().error(f"Failed to save common code {common_code_name}: {e!s}")
 				import traceback
+
 				frappe.logger().error(traceback.format_exc())
 				continue
 
@@ -240,7 +247,7 @@ def import_codes_from_xml(code_list_name, xml_file_path, doctype_mappings):
 		return imported_count
 
 	except Exception as e:
-		frappe.logger().error(f"Failed to import codes from {xml_file_path}: {str(e)}")
+		frappe.logger().error(f"Failed to import codes from {xml_file_path}: {e!s}")
 		return 0
 
 
@@ -249,10 +256,7 @@ def cleanup_existing_common_codes(code_list_name):
 
 	try:
 		# Find all Common Code documents for this code list
-		common_codes = frappe.get_all("Common Code",
-			filters={"code_list": code_list_name},
-			fields=["name"]
-		)
+		common_codes = frappe.get_all("Common Code", filters={"code_list": code_list_name}, fields=["name"])
 
 		deleted_count = 0
 		for common_code in common_codes:
@@ -260,13 +264,15 @@ def cleanup_existing_common_codes(code_list_name):
 				frappe.delete_doc("Common Code", common_code.name, force=True)
 				deleted_count += 1
 			except Exception as e:
-				frappe.logger().warning(f"Failed to delete common code {common_code.name}: {str(e)}")
+				frappe.logger().warning(f"Failed to delete common code {common_code.name}: {e!s}")
 
 		frappe.db.commit()
-		frappe.logger().info(f"Cleaned up {deleted_count} existing common codes for code list '{code_list_name}'")
+		frappe.logger().info(
+			f"Cleaned up {deleted_count} existing common codes for code list '{code_list_name}'"
+		)
 
 	except Exception as e:
-		frappe.logger().error(f"Failed to cleanup common codes for {code_list_name}: {str(e)}")
+		frappe.logger().error(f"Failed to cleanup common codes for {code_list_name}: {e!s}")
 
 
 def set_default_common_code(code_list_name, default_code_value):
@@ -274,16 +280,16 @@ def set_default_common_code(code_list_name, default_code_value):
 
 	try:
 		# Find the Common Code document with the default code value
-		common_codes = frappe.get_all("Common Code",
-			filters={
-				"code_list": code_list_name,
-				"common_code": default_code_value
-			},
-			fields=["name"]
+		common_codes = frappe.get_all(
+			"Common Code",
+			filters={"code_list": code_list_name, "common_code": default_code_value},
+			fields=["name"],
 		)
 
 		if not common_codes:
-			frappe.logger().warning(f"Default common code '{default_code_value}' not found in code list '{code_list_name}'")
+			frappe.logger().warning(
+				f"Default common code '{default_code_value}' not found in code list '{code_list_name}'"
+			)
 			return
 
 		default_common_code_name = common_codes[0].name
@@ -293,10 +299,12 @@ def set_default_common_code(code_list_name, default_code_value):
 		code_list.default_common_code = default_common_code_name
 		code_list.save()
 
-		frappe.logger().info(f"Set default common code '{default_code_value}' for code list '{code_list_name}'")
+		frappe.logger().info(
+			f"Set default common code '{default_code_value}' for code list '{code_list_name}'"
+		)
 
 	except Exception as e:
-		frappe.logger().error(f"Failed to set default common code for {code_list_name}: {str(e)}")
+		frappe.logger().error(f"Failed to set default common code for {code_list_name}: {e!s}")
 
 
 def cleanup_existing_mappings():
@@ -309,34 +317,33 @@ def cleanup_existing_mappings():
 			"urn:peppol:id:codelist:ISO3166-1_Alpha2",
 			"urn:peppol:id:codelist:UNECERec20",
 			"urn:peppol:id:codelist:UNCL4461",
-			"urn:peppol:id:codelist:eas"
+			"urn:peppol:id:codelist:eas",
 		]
 
 		cleanup_count = 0
 		for code_list_uri in code_lists:
 			try:
 				# Find all Common Code documents for this code list
-				common_codes = frappe.get_all("Common Code",
-					filters={"code_list": code_list_uri},
-					fields=["name"]
+				common_codes = frappe.get_all(
+					"Common Code", filters={"code_list": code_list_uri}, fields=["name"]
 				)
 
 				for common_code_doc in common_codes:
 					common_code = frappe.get_doc("Common Code", common_code_doc.name)
 					# Clear all applies_to mappings
-					if hasattr(common_code, 'applies_to') and common_code.applies_to:
+					if hasattr(common_code, "applies_to") and common_code.applies_to:
 						common_code.applies_to = []
 						common_code.save()
 						cleanup_count += 1
 
 			except Exception as e:
-				frappe.logger().warning(f"Error cleaning mappings for {code_list_uri}: {str(e)}")
+				frappe.logger().warning(f"Error cleaning mappings for {code_list_uri}: {e!s}")
 
 		frappe.db.commit()
 		frappe.logger().info(f"Cleaned up mappings for {cleanup_count} common codes")
 
 	except Exception as e:
-		frappe.logger().error(f"Failed to cleanup existing mappings: {str(e)}")
+		frappe.logger().error(f"Failed to cleanup existing mappings: {e!s}")
 
 
 def create_erpnext_mappings():
@@ -433,39 +440,38 @@ def create_erpnext_mappings():
 	# EAS (Electronic Address Scheme) mappings to countries
 	eas_mappings = [
 		# VAT Number schemes (corrected)
-		("Austria", "9914"),      # Austrian VAT number
-		("Belgium", "9925"),      # Belgium VAT number  
-		("Bulgaria", "9926"),     # Bulgaria VAT number
-		("Croatia", "9934"),      # Croatia VAT number
-		("Cyprus", "9928"),       # Cyprus VAT number
-		("Czech Republic", "9929"), # Czech Republic VAT number
-		("Estonia", "9931"),      # Estonia VAT number
-		("France", "9957"),       # French VAT number
-		("Germany", "9930"),      # Germany VAT number
-		("Greece", "9933"),       # Greece VAT number
-		("Hungary", "9910"),      # Hungary VAT number
-		("Ireland", "9935"),      # Ireland VAT number
-		("Lithuania", "9937"),    # Lithuania VAT number
-		("Luxembourg", "9938"),   # Luxembourg VAT number
-		("Malta", "9943"),        # Malta VAT number
+		("Austria", "9914"),  # Austrian VAT number
+		("Belgium", "9925"),  # Belgium VAT number
+		("Bulgaria", "9926"),  # Bulgaria VAT number
+		("Croatia", "9934"),  # Croatia VAT number
+		("Cyprus", "9928"),  # Cyprus VAT number
+		("Czech Republic", "9929"),  # Czech Republic VAT number
+		("Estonia", "9931"),  # Estonia VAT number
+		("France", "9957"),  # French VAT number
+		("Germany", "9930"),  # Germany VAT number
+		("Greece", "9933"),  # Greece VAT number
+		("Hungary", "9910"),  # Hungary VAT number
+		("Ireland", "9935"),  # Ireland VAT number
+		("Lithuania", "9937"),  # Lithuania VAT number
+		("Luxembourg", "9938"),  # Luxembourg VAT number
+		("Malta", "9943"),  # Malta VAT number
 		("Netherlands", "9944"),  # Netherlands VAT number
-		("Poland", "9945"),       # Poland VAT number
-		("Portugal", "9946"),     # Portugal VAT number
-		("Romania", "9947"),      # Romania VAT number
-		("Slovenia", "9949"),     # Slovenia VAT number
-		("Slovakia", "9950"),     # Slovakia VAT number
-		("United Kingdom", "9932"), # United Kingdom VAT number
-		
+		("Poland", "9945"),  # Poland VAT number
+		("Portugal", "9946"),  # Portugal VAT number
+		("Romania", "9947"),  # Romania VAT number
+		("Slovenia", "9949"),  # Slovenia VAT number
+		("Slovakia", "9950"),  # Slovakia VAT number
+		("United Kingdom", "9932"),  # United Kingdom VAT number
 		# Country-specific identifier schemes
-		("Belgium", "0208"),      # Belgian Enterprise Number
+		("Belgium", "0208"),  # Belgian Enterprise Number
 		("Netherlands", "0106"),  # Dutch Chamber of Commerce (KVK)
-		("Sweden", "0007"),      # Swedish Organization Number
-		("Finland", "0037"),      # Finnish Business ID (LY-tunnus)
-		("Denmark", "0096"),     # Danish Chamber of Commerce
-		("Norway", "0192"),      # Norwegian Organization Number
-		("Switzerland", "0183"), # Swiss UID
-		("Global", "0088"),      # GLN (Global Location Number)
-		("Email", "EM"),          # Email (most common fallback)
+		("Sweden", "0007"),  # Swedish Organization Number
+		("Finland", "0037"),  # Finnish Business ID (LY-tunnus)
+		("Denmark", "0096"),  # Danish Chamber of Commerce
+		("Norway", "0192"),  # Norwegian Organization Number
+		("Switzerland", "0183"),  # Swiss UID
+		("Global", "0088"),  # GLN (Global Location Number)
+		("Email", "EM"),  # Email (most common fallback)
 	]
 
 	for country_name, eas_code in eas_mappings:
@@ -479,9 +485,9 @@ def create_mapping(code_list_uri, code_value, doctype, docname):
 
 	try:
 		# Find the Common Code
-		common_codes = frappe.get_all("Common Code",
-			filters={"code_list": code_list_uri, "common_code": code_value},
-			fields=["name"])
+		common_codes = frappe.get_all(
+			"Common Code", filters={"code_list": code_list_uri, "common_code": code_value}, fields=["name"]
+		)
 
 		if not common_codes:
 			frappe.logger().warning(f"Common Code not found: {code_list_uri} - {code_value}")
@@ -490,30 +496,32 @@ def create_mapping(code_list_uri, code_value, doctype, docname):
 		common_code = frappe.get_doc("Common Code", common_codes[0].name)
 
 		# Check if mapping already exists
-		existing_links = [link.link_name for link in common_code.get("applies_to", [])
-						if link.link_doctype == doctype and link.link_name == docname]
+		existing_links = [
+			link.link_name
+			for link in common_code.get("applies_to", [])
+			if link.link_doctype == doctype and link.link_name == docname
+		]
 
 		if existing_links:
 			return  # Already mapped
 
 		# Add the mapping
-		common_code.append("applies_to", {
-			"doctype": "Dynamic Link",
-			"link_doctype": doctype,
-			"link_name": docname
-		})
+		common_code.append(
+			"applies_to", {"doctype": "Dynamic Link", "link_doctype": doctype, "link_name": docname}
+		)
 
 		common_code.save()
 		frappe.logger().info(f"Mapped {doctype}:{docname} to {code_list_uri}:{code_value}")
 
 	except Exception as e:
-		frappe.logger().error(f"Failed to create mapping {doctype}:{docname} -> {code_value}: {str(e)}")
+		frappe.logger().error(f"Failed to create mapping {doctype}:{docname} -> {code_value}: {e!s}")
 
 
 # For bench execute compatibility
 def execute():
-    """Entry point for bench execute command."""
-    setup_peppol_codes()
+	"""Entry point for bench execute command."""
+	setup_peppol_codes()
+
 
 if __name__ == "__main__":
-    setup_peppol_codes()
+	setup_peppol_codes()

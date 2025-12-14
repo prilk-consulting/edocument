@@ -67,10 +67,10 @@ try:
     # Create combined UBL validation
     print("\nCreating combined CEN+PEPPOL UBL schematron...")
 
-    with open("sch/CEN-EN16931-UBL.sch", 'r') as f:
+    with open("sch/CEN-EN16931-UBL.sch") as f:
         cen_content = f.read()
 
-    with open("sch/PEPPOL-EN16931-UBL.sch", 'r') as f:
+    with open("sch/PEPPOL-EN16931-UBL.sch") as f:
         peppol_content = f.read()
 
     # Simple combination

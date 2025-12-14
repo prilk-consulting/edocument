@@ -1,4 +1,4 @@
-exclude: 'node_modules|.git'
+exclude: 'node_modules|.git|peppol-bis-invoice-3|UBL-2.1'
 default_stages: [pre-commit]
 fail_fast: false
 
@@ -9,7 +9,7 @@ repos:
     hooks:
       - id: trailing-whitespace
         files: "edocument.*"
-        exclude: ".*json$|.*txt$|.*csv|.*md|.*svg"
+        exclude: ".*json$|.*txt$|.*csv|.*md|.*svg|peppol-bis-invoice-3|UBL-2.1"
       - id: check-merge-conflict
       - id: check-ast
       - id: check-json
@@ -23,12 +23,15 @@ repos:
       - id: ruff
         name: "Run ruff import sorter"
         args: ["--select=I", "--fix"]
+        exclude: "peppol-bis-invoice-3|UBL-2.1"
 
       - id: ruff
         name: "Run ruff linter"
+        exclude: "peppol-bis-invoice-3|UBL-2.1"
 
       - id: ruff-format
         name: "Run ruff formatter"
+        exclude: "peppol-bis-invoice-3|UBL-2.1"
 
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: v2.7.1
@@ -42,7 +45,9 @@ repos:
                 .*node_modules.*|
                 .*boilerplate.*|
                 edocument/templates/includes/.*|
-                edocument/public/js/lib/.*
+                edocument/public/js/lib/.*|
+                .*peppol-bis-invoice-3.*|
+                .*UBL-2.1.*
             )$
 
 
@@ -60,7 +65,9 @@ repos:
                 .*node_modules.*|
                 .*boilerplate.*|
                 edocument/templates/includes/.*|
-                edocument/public/js/lib/.*
+                edocument/public/js/lib/.*|
+                .*peppol-bis-invoice-3.*|
+                .*UBL-2.1.*
             )$
 
 ci:

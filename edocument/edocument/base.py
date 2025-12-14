@@ -7,21 +7,21 @@ These provide a common interface that all generators and validators should imple
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+from typing import Any
 
 
 class BaseGenerator(ABC):
 	"""Base class for all EDocument generators"""
-	
+
 	@abstractmethod
 	def generate(self, source_doc, edocument_profile) -> bytes:
 		"""
 		Generate XML from source document.
-		
+
 		Args:
 			source_doc: The source document (e.g., Sales Invoice, Purchase Invoice)
 			edocument_profile: The EDocument Profile document
-			
+
 		Returns:
 			bytes: The generated XML as bytes
 		"""
@@ -30,16 +30,16 @@ class BaseGenerator(ABC):
 
 class BaseValidator(ABC):
 	"""Base class for all EDocument validators"""
-	
+
 	@abstractmethod
-	def validate(self, xml_bytes: bytes, edocument_profile) -> Dict[str, Any]:
+	def validate(self, xml_bytes: bytes, edocument_profile) -> dict[str, Any]:
 		"""
 		Validate XML against profile requirements.
-		
+
 		Args:
 			xml_bytes: The XML content as bytes
 			edocument_profile: The EDocument Profile document
-			
+
 		Returns:
 			dict: Validation result with keys:
 				- is_valid: bool - Whether validation passed
@@ -47,4 +47,3 @@ class BaseValidator(ABC):
 				- warnings: list - List of warnings (optional)
 		"""
 		pass
-

@@ -5,5 +5,3 @@
 Profiles module for EDocument.
 Import profile modules here to register them automatically.
 """
-
-

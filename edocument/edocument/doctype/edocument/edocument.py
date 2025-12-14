@@ -9,51 +9,51 @@ from frappe.model.document import Document
 def _detect_profile_from_xml(xml_bytes: bytes) -> str | None:
 	"""
 	Detect EDocument Profile from XML bytes using precise matching.
-	
+
 	Requires all 3 fields: namespace + element_name + identifier_value
-	
+
 	Args:
 		xml_bytes: The XML content as bytes
-		
+
 	Returns:
 		str | None: The name of the EDocument Profile, or None if not detected
 	"""
 	try:
 		from lxml import etree as ET
-		
+
 		root = ET.fromstring(xml_bytes)
-		
+
 		# Get all namespaces declared in the XML document
 		all_xml_namespaces = set(root.nsmap.values()) if root.nsmap else set()
-		
+
 		# Get all profiles
 		profiles = frappe.get_all(
 			"EDocument Profile",
-			fields=["name", "identifier_value", "identifier_element_name", "identifier_namespace"]
+			fields=["name", "identifier_value", "identifier_element_name", "identifier_namespace"],
 		)
-		
+
 		for profile in profiles:
 			namespace = profile.get("identifier_namespace")
 			element_name = profile.get("identifier_element_name")
 			identifier_value = profile.get("identifier_value")
-			
+
 			# All 3 fields are required for precise matching
 			if not namespace or not element_name or not identifier_value:
 				continue
-			
+
 			# Check if the profile's namespace exists in the XML
 			if namespace not in all_xml_namespaces:
 				continue
-			
+
 			# Find element in the profile's namespace
-			elem = root.findall(f'.//{{{namespace}}}{element_name}')
+			elem = root.findall(f".//{{{namespace}}}{element_name}")
 			if elem and elem[0].text:
 				if elem[0].text.strip() == identifier_value:
 					return profile["name"]
-		
+
 	except Exception as e:
-		frappe.log_error(f"Error detecting profile from XML: {str(e)}", "EDocument Profile Detection Error")
-	
+		frappe.log_error(f"Error detecting profile from XML: {e!s}", "EDocument Profile Detection Error")
+
 	return None
 
 
@@ -66,12 +66,12 @@ class EDocument(Document):
 			filters={
 				"attached_to_doctype": "EDocument",
 				"attached_to_name": self.name,
-				"file_name": ["like", "%.xml"]
+				"file_name": ["like", "%.xml"],
 			},
-			limit=1
+			limit=1,
 		)
 		return len(xml_files) > 0
-	
+
 	def _generate_xml_internal(self):
 		"""
 		Internal method to generate XML (used by before_save).
@@ -79,25 +79,25 @@ class EDocument(Document):
 		"""
 		if not self.edocument_source_type or not self.edocument_source_document:
 			raise ValueError(_("Source Type and Source Document are required to generate XML."))
-		
+
 		if not self.edocument_profile:
 			raise ValueError(_("EDocument Profile is required to generate XML."))
-		
+
 		# Get the source document
 		source_doc = frappe.get_doc(self.edocument_source_type, self.edocument_source_document)
-		
+
 		# Get the profile to determine which generator to use
 		edocument_profile = frappe.get_doc("EDocument Profile", self.edocument_profile)
-		
+
 		# Import and call the profile-specific generator
 		from edocument.edocument.generator import get_xml_generator
-		
+
 		# Generate XML using profile-specific generator
 		xml_bytes = get_xml_generator(source_doc, edocument_profile)
-		
+
 		# Create filename
 		filename = f"{self.name}_{self.edocument_source_document}.xml"
-		
+
 		# Attach file to EDocument
 		file_doc = frappe.get_doc(
 			{
@@ -111,14 +111,14 @@ class EDocument(Document):
 			}
 		)
 		file_doc.insert(ignore_permissions=True)
-		
+
 		# Reset status and error when new XML is generated
 		# (since this is a new XML that hasn't been validated yet)
 		self.status = None  # Clear status - will be set after validation
-		self.error = None   # Clear previous errors
-		
+		self.error = None  # Clear previous errors
+
 		return filename
-	
+
 	@frappe.whitelist()
 	def generate_xml(self):
 		"""
@@ -131,17 +131,15 @@ class EDocument(Document):
 			# Save the document to persist status and error field changes
 			# _generate_xml_internal() already sets self.status and self.error
 			self.save()
-			
+
 			frappe.msgprint(
-				_("XML file {0} generated and attached successfully.").format(
-					frappe.bold(file_name)
-				),
+				_("XML file {0} generated and attached successfully.").format(frappe.bold(file_name)),
 				indicator="green",
 				alert=True,
 			)
-			
+
 			return file_name
-			
+
 		except Exception as e:
 			# Update error field on generation failure (no status change - validation hasn't happened yet)
 			error_msg = str(e)
@@ -149,7 +147,7 @@ class EDocument(Document):
 			self.save()
 			frappe.log_error(f"Error generating XML for EDocument {self.name}: {error_msg}")
 			frappe.throw(_("Error generating XML: {0}").format(error_msg))
-	
+
 	def _validate_xml_internal(self):
 		"""
 		Internal method to validate XML (used by before_save).
@@ -158,50 +156,50 @@ class EDocument(Document):
 		# Initialize status and error fields
 		self.status = None
 		self.error = None
-		
+
 		if not self.edocument_profile:
 			return
-		
+
 		# Get XML from attached files (both uploaded and generated XML are attached)
 		try:
 			xml_bytes = self._get_xml_from_attached_files()
 		except Exception as e:
 			error_msg = _("Cannot retrieve XML file for validation.")
-			error_details = f"{error_msg}\nError: {str(e)}"
+			error_details = f"{error_msg}\nError: {e!s}"
 			self.status = "Validation Failed"
 			self.error = error_details
 			frappe.log_error(error_details, reference_doctype=self.doctype, reference_name=self.name)
 			return
-		
+
 		# Get the profile to determine which validator to use
 		try:
 			edocument_profile = frappe.get_doc("EDocument Profile", self.edocument_profile)
 		except Exception as e:
 			error_msg = _("Cannot load EDocument Profile.")
-			error_details = f"{error_msg}\nError: {str(e)}\nProfile: {self.edocument_profile}"
+			error_details = f"{error_msg}\nError: {e!s}\nProfile: {self.edocument_profile}"
 			self.status = "Validation Failed"
 			self.error = error_details
 			frappe.log_error(error_details, reference_doctype=self.doctype, reference_name=self.name)
 			return
-		
+
 		# Import and call the profile-specific validator
 		from edocument.edocument.validator import get_xml_validator
-		
+
 		try:
 			# Validate XML using profile-specific validator
 			validation_result = get_xml_validator(xml_bytes, edocument_profile)
 		except Exception as e:
 			error_msg = _("Cannot validate XML.")
-			error_details = f"{error_msg}\nError: {str(e)}\nProfile: {self.edocument_profile}"
+			error_details = f"{error_msg}\nError: {e!s}\nProfile: {self.edocument_profile}"
 			self.status = "Validation Failed"
 			self.error = error_details
 			frappe.log_error(error_details, reference_doctype=self.doctype, reference_name=self.name)
 			return
-		
+
 		# Build error message from errors and warnings
 		error_msg = validation_result.get("error")
 		warnings = validation_result.get("warnings", [])
-		
+
 		# Combine errors and warnings in the error field
 		error_text_parts = []
 		if error_msg:
@@ -209,9 +207,9 @@ class EDocument(Document):
 		if warnings:
 			warnings_text = "\n".join(warnings)
 			error_text_parts.append(f"Warnings:\n{warnings_text}")
-		
+
 		error_text = "\n\n".join(error_text_parts) if error_text_parts else None
-		
+
 		# Update status and error fields on self (will be saved automatically in before_save)
 		if validation_result.get("is_valid"):
 			self.status = "Validation Successful"
@@ -219,7 +217,7 @@ class EDocument(Document):
 		else:
 			self.status = "Validation Failed"
 			self.error = error_text or _("Validation failed")
-	
+
 	@frappe.whitelist()
 	def validate_xml(self):
 		"""
@@ -239,7 +237,7 @@ class EDocument(Document):
 			self.error = error_msg
 			self.save()
 			frappe.log_error(f"Error validating XML for EDocument {self.name}: {error_msg}")
-	
+
 	def before_save(self):
 		"""
 		Automatically detect profile, generate XML, and validate XML on save.
@@ -254,11 +252,11 @@ class EDocument(Document):
 		# If neither condition is met, keep existing value or default to "Outgoing"
 		elif not self.direction:
 			self.direction = "Outgoing"
-		
+
 		# Auto-detect profile from XML if:
 		xml_file_changed = self.has_value_changed("xml_file")
 		should_detect = (xml_file_changed or not self.edocument_profile) and self.xml_file
-		
+
 		if should_detect:
 			# Try to detect profile from XML
 			try:
@@ -272,9 +270,9 @@ class EDocument(Document):
 				error_msg = str(e)
 				frappe.log_error(
 					f"Error detecting profile from XML for EDocument {self.name if self.name else 'NEW'}: {error_msg}\nTraceback: {frappe.get_traceback()}",
-					"EDocument Profile Detection Error"
+					"EDocument Profile Detection Error",
 				)
-		
+
 		if self.edocument_source_document and self.edocument_profile and not self.xml_file:
 			# Check if XML already exists (for generated XML)
 			if not self._has_xml_file():
@@ -284,8 +282,10 @@ class EDocument(Document):
 				except Exception as e:
 					error_msg = str(e)
 					self.error = f"Error generating XML: {error_msg}"
-					frappe.log_error(f"Error during automatic XML generation for EDocument {self.name}: {error_msg}")
-		
+					frappe.log_error(
+						f"Error during automatic XML generation for EDocument {self.name}: {error_msg}"
+					)
+
 		if self.edocument_profile:
 			# Validate XML automatically
 			try:
@@ -295,8 +295,10 @@ class EDocument(Document):
 				error_msg = str(e)
 				self.status = "Validation Failed"
 				self.error = error_msg
-				frappe.log_error(f"Error during automatic XML validation for EDocument {self.name}: {error_msg}")
-	
+				frappe.log_error(
+					f"Error during automatic XML validation for EDocument {self.name}: {error_msg}"
+				)
+
 	def on_update(self):
 		"""
 		Called after document is saved.
@@ -305,7 +307,7 @@ class EDocument(Document):
 		# Auto-detect profile from XML if:
 		xml_file_changed = self.has_value_changed("xml_file")
 		should_detect = (xml_file_changed or not self.edocument_profile) and self.xml_file
-		
+
 		if should_detect:
 			# Try to detect profile from XML
 			try:
@@ -319,17 +321,19 @@ class EDocument(Document):
 							frappe.db.commit()
 			except Exception as e:
 				# If detection fails, log but don't block save
-				frappe.log_error(f"Error detecting profile from XML in on_update for EDocument {self.name}: {str(e)}")
-	
+				frappe.log_error(
+					f"Error detecting profile from XML in on_update for EDocument {self.name}: {e!s}"
+				)
+
 	def _get_xml_from_attached_files(self) -> bytes:
 		"""
 		Get XML bytes from the most recently attached XML file.
 		Both uploaded and generated XML files are attached to the document.
 		We only need the last/most recent XML file.
-		
+
 		Returns:
 			bytes: XML content as bytes
-			
+
 		Raises:
 			ValueError: If no XML file found or file cannot be read
 		"""
@@ -341,21 +345,27 @@ class EDocument(Document):
 			if self.name:
 				file_doc = frappe.db.get_value(
 					"File",
-					{"file_url": self.xml_file, "attached_to_doctype": "EDocument", "attached_to_name": self.name},
+					{
+						"file_url": self.xml_file,
+						"attached_to_doctype": "EDocument",
+						"attached_to_name": self.name,
+					},
 					"name",
-					as_dict=True
+					as_dict=True,
 				)
 				if file_doc:
 					try:
 						file_doc_obj = frappe.get_doc("File", file_doc.name)
 						content = file_doc_obj.get_content()
 						if isinstance(content, str):
-							return content.encode('utf-8')
+							return content.encode("utf-8")
 						return content
 					except Exception as e:
-						frappe.log_error(f"Error reading file {file_doc.name}: {str(e)}", "EDocument File Read Error")
-						raise ValueError(f"Cannot read file: {str(e)}")
-			
+						frappe.log_error(
+							f"Error reading file {file_doc.name}: {e!s}", "EDocument File Read Error"
+						)
+						raise ValueError(f"Cannot read file: {e!s}")
+
 			# If not found attached, try to find by file_url only (might not be attached yet)
 			file_doc = frappe.db.get_value("File", {"file_url": self.xml_file}, "name", as_dict=True)
 			if file_doc:
@@ -363,43 +373,47 @@ class EDocument(Document):
 					file_doc_obj = frappe.get_doc("File", file_doc.name)
 					content = file_doc_obj.get_content()
 					if isinstance(content, str):
-						return content.encode('utf-8')
+						return content.encode("utf-8")
 					return content
 				except Exception as e:
-					frappe.log_error(f"Error reading file {file_doc.name}: {str(e)}", "EDocument File Read Error")
-					raise ValueError(f"Cannot read file: {str(e)}")
-		
+					frappe.log_error(
+						f"Error reading file {file_doc.name}: {e!s}", "EDocument File Read Error"
+					)
+					raise ValueError(f"Cannot read file: {e!s}")
+
 		# Get only the most recently created XML file (last one)
 		# Only search if document has a name (not a new unsaved document)
 		if not self.name:
 			raise ValueError("Document must be saved before reading XML file.")
-		
+
 		xml_files = frappe.get_all(
 			"File",
 			filters={
 				"attached_to_doctype": "EDocument",
 				"attached_to_name": self.name,
-				"file_name": ["like", "%.xml"]
+				"file_name": ["like", "%.xml"],
 			},
 			order_by="creation desc",
-			limit=1
+			limit=1,
 		)
-		
+
 		if not xml_files:
 			raise ValueError("No XML file found. Please upload an XML file or generate XML first.")
-		
+
 		# Get the XML file content
 		try:
 			file_doc = frappe.get_doc("File", xml_files[0].name)
 			content = file_doc.get_content()
 			# Ensure we always return bytes (get_content() might return str for text files)
 			if isinstance(content, str):
-				return content.encode('utf-8')
+				return content.encode("utf-8")
 			return content
 		except Exception as e:
-			frappe.log_error(f"Error reading XML file {xml_files[0].name}: {str(e)}", "EDocument File Read Error")
-			raise ValueError(f"Cannot read XML file: {str(e)}")
-	
+			frappe.log_error(
+				f"Error reading XML file {xml_files[0].name}: {e!s}", "EDocument File Read Error"
+			)
+			raise ValueError(f"Cannot read XML file: {e!s}")
+
 	@frappe.whitelist()
 	def create_and_save_document(self):
 		"""
@@ -410,26 +424,25 @@ class EDocument(Document):
 		try:
 			# Use the standalone create_document function to get the document
 			doc = create_document(self.name, target_doc=None)
-			
+
 			# Save the document
 			doc.insert(ignore_permissions=True)
-			
+
 			# Update EDocument with target document information
 			self.edocument_target_type = doc.doctype
 			self.edocument_target_document = doc.name
 			self.save()
-			
+
 			frappe.msgprint(
 				_("{0} {1} created successfully from XML.").format(
-					frappe.bold(doc.doctype),
-					frappe.bold(doc.name)
+					frappe.bold(doc.doctype), frappe.bold(doc.name)
 				),
 				indicator="green",
 				alert=True,
 			)
-			
+
 			return doc.name
-			
+
 		except Exception as e:
 			error_msg = str(e)
 			self.error = error_msg
@@ -445,45 +458,45 @@ def create_document(source_name, target_doc=None):
 	Used by both:
 	- frappe.model.open_mapped_doc to open document with prefilled data (returns unsaved doc)
 	- create_and_save_document instance method (which then saves it)
-	
+
 	Args:
 		source_name: Name of the EDocument
 		target_doc: Optional target document (if None, creates new document)
-		
+
 	Returns:
 		Document (not saved) - caller can save it or open it in UI
 	"""
 	# Get the EDocument instance
 	edocument = frappe.get_doc("EDocument", source_name)
-	
+
 	if not edocument.edocument_profile:
 		frappe.throw(_("EDocument Profile is required to parse XML and create document."))
-	
+
 	# Get XML bytes from attached files
 	xml_bytes = edocument._get_xml_from_attached_files()
-	
+
 	# Get the profile to determine which parser to use
 	edocument_profile = frappe.get_doc("EDocument Profile", edocument.edocument_profile)
-	
+
 	# Import and call the profile-specific parser
 	from edocument.edocument.parser import get_xml_parser
-	
+
 	# Parse XML using profile-specific parser
 	document_data = get_xml_parser(xml_bytes, edocument_profile)
-	
+
 	# Validate that parser returned a dict with doctype
 	if not isinstance(document_data, dict):
 		frappe.throw(_("Parser must return a dictionary with document data."))
-	
+
 	if "doctype" not in document_data:
 		frappe.throw(_("Parser must return a dictionary with 'doctype' field."))
-	
+
 	doctype = document_data["doctype"]
 	doc = frappe.new_doc(doctype)
 	doc.update(document_data)
-	
+
 	# Set missing values before returning
 	doc.set_missing_values()
-	
+
 	# Return document (not saved) - caller decides whether to save or open in UI
 	return doc

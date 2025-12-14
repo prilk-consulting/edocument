@@ -8,9 +8,9 @@ validation, and parsing functionality.
 
 # UBL 2.1 standard namespaces (shared constant)
 UBL_NAMESPACES = {
-    'ubl': 'urn:oasis:names:specification:ubl:schema:xsd:Invoice-2',
-    'cbc': 'urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2',
-    'cac': 'urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2'
+	"ubl": "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2",
+	"cbc": "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2",
+	"cac": "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2",
 }
 
 # PEPPOL BIS Billing 3.0 Constants
@@ -21,46 +21,46 @@ PEPPOL_PROFILE_ID = "urn:fdc:peppol.eu:2017:poacc:billing:01:1.0"
 # Maps invoice type codes to UBL document types
 # UNCL1001 codes: 380=Invoice, 381=Credit Note, 383=Debit Note, 384=Corrected Invoice
 DOCUMENT_TYPE_MAPPING = {
-    '380': 'Invoice',      # Commercial invoice
-    '384': 'Invoice',      # Corrected invoice (still uses Invoice root)
-    '381': 'CreditNote',   # Credit note
-    '383': 'DebitNote',    # Debit note (for future support)
+	"380": "Invoice",  # Commercial invoice
+	"384": "Invoice",  # Corrected invoice (still uses Invoice root)
+	"381": "CreditNote",  # Credit note
+	"383": "DebitNote",  # Debit note (for future support)
 }
 
 # UBL 2.1 Document Type Namespaces
 DOCUMENT_TYPE_NAMESPACES = {
-    'Invoice': 'urn:oasis:names:specification:ubl:schema:xsd:Invoice-2',
-    'CreditNote': 'urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2',
-    'DebitNote': 'urn:oasis:names:specification:ubl:schema:xsd:DebitNote-2',
+	"Invoice": "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2",
+	"CreditNote": "urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2",
+	"DebitNote": "urn:oasis:names:specification:ubl:schema:xsd:DebitNote-2",
 }
 
 # UBL 2.1 Document Type XSD Files
 DOCUMENT_TYPE_XSD_FILES = {
-    'Invoice': 'UBL-Invoice-2.1.xsd',
-    'CreditNote': 'UBL-CreditNote-2.1.xsd',
-    'DebitNote': 'UBL-DebitNote-2.1.xsd',
+	"Invoice": "UBL-Invoice-2.1.xsd",
+	"CreditNote": "UBL-CreditNote-2.1.xsd",
+	"DebitNote": "UBL-DebitNote-2.1.xsd",
 }
 
 # Element names for different document types
 DOCUMENT_TYPE_ELEMENTS = {
-    'Invoice': {
-        'root': 'Invoice',
-        'type_code': 'InvoiceTypeCode',
-        'line': 'InvoiceLine',
-        'quantity': 'InvoicedQuantity',
-    },
-    'CreditNote': {
-        'root': 'CreditNote',
-        'type_code': 'CreditNoteTypeCode',
-        'line': 'CreditNoteLine',
-        'quantity': 'CreditedQuantity',
-    },
-    'DebitNote': {
-        'root': 'DebitNote',
-        'type_code': 'DebitNoteTypeCode',
-        'line': 'DebitNoteLine',
-        'quantity': 'DebitedQuantity',
-    },
+	"Invoice": {
+		"root": "Invoice",
+		"type_code": "InvoiceTypeCode",
+		"line": "InvoiceLine",
+		"quantity": "InvoicedQuantity",
+	},
+	"CreditNote": {
+		"root": "CreditNote",
+		"type_code": "CreditNoteTypeCode",
+		"line": "CreditNoteLine",
+		"quantity": "CreditedQuantity",
+	},
+	"DebitNote": {
+		"root": "DebitNote",
+		"type_code": "DebitNoteTypeCode",
+		"line": "DebitNoteLine",
+		"quantity": "DebitedQuantity",
+	},
 }
 
 # Global code retrievers for PEPPOL standardized codes (shared across generator and import)
