@@ -1,9 +1,12 @@
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
+from edocument.edocument.profiles.peppol.setup_peppol_codes import setup_peppol_codes
+
 
 
 def after_install():
 	create_custom_fields(get_custom_fields())
 	create_peppol_profile()
+	setup_peppol_codes()
 
 
 def get_custom_fields():
