@@ -4,7 +4,7 @@
  "creation": "2025-11-08 06:54:38.804475",
  "doctype": "DocType",
  "engine": "InnoDB",
- "field_order": [
+  "field_order": [
   "identifier_value",
   "identifier_element_name",
   "identifier_namespace",
@@ -17,7 +17,8 @@
   "schema_files_section",
   "generator_path",
   "validator_path",
-  "parser_path"
+  "parser_path",
+  "preview_path"
  ],
  "fields": [
   {
@@ -90,6 +91,11 @@
    "fieldname": "parser_path",
    "fieldtype": "Data",
    "label": "Parser Path"
+  },
+  {
+   "fieldname": "preview_path",
+   "fieldtype": "Data",
+   "label": "Preview Path"
   }
  ],
  "grid_page_length": 50,

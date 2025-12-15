@@ -21,7 +21,9 @@
   "edocument_target_type",
   "edocument_target_document",
   "error_section",
-  "error"
+  "error",
+  "preview_section",
+  "edocument_preview"
  ],
  "fields": [
   {
@@ -123,12 +125,24 @@
   {
    "fieldname": "column_break_avdv",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "preview_section",
+   "fieldtype": "Section Break",
+   "label": "Preview"
+  },
+  {
+   "fieldname": "edocument_preview",
+   "fieldtype": "HTML",
+   "label": "EDocument Preview",
+   "hidden": 0,
+   "columns": 12
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-11-17 06:51:47.578264",
+ "modified": "2025-12-15 01:48:10.306390",
  "modified_by": "Administrator",
  "module": "Edocument",
  "name": "EDocument",
