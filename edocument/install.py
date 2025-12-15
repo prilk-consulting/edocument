@@ -136,6 +136,7 @@ def create_peppol_profile():
 				"generator_path": "edocument.edocument.profiles.peppol.generator.generate_peppol_xml",
 				"parser_path": "edocument.edocument.profiles.peppol.parser.parse_peppol_xml",
 				"validator_path": "edocument.edocument.profiles.peppol.validator.validate_peppol_xml",
+				"preview_path": "edocument.edocument.profiles.peppol.preview.preview_peppol_xml",
 				"validate_sales_invoice_on_save": 0,
 				"validate_sales_invoice_on_submit": 0,
 				"action_on_validation_error_during_save": 0,

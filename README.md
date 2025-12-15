@@ -10,6 +10,7 @@ This app provides a flexible framework for generating and parsing electronic doc
 - **UBL 2.1 XML Generation**: Generate compliant UBL 2.1 XML for invoices and credit notes
 - **Multiple Document Types**: Support for Invoice and CreditNote
 - **XML Validation**: XSD schema validation and Schematron business rule validation
+- **HTML Preview**: Visual preview of generated XML using XSLT transformations
 - **Code List Management**: Automatic code list handling for PEPPOL standards
 - **Profile-Based Architecture**: Extensible profile system for different e-document standards
 - **Import/Export**: Import incoming PEPPOL invoices and export outgoing invoices
@@ -32,8 +33,8 @@ Please use a branch that matches the major version of ERPNext you are using. For
 
 This app requires the following Python packages (automatically installed):
 
-- **saxonche** (~=12.5.0): XSLT 3.0 processor for Schematron validation
-- **lxml** (>=4.9.3,<6.0.0): XML parsing and XSD validation
+- **saxonche** (~=12.5.0): XSLT 3.0 processor for Schematron validation and HTML preview
+- **lxml** (>=4.9.3,<6.0.0): XML parsing, XSD validation, and XSLT processing
 
 These dependencies are specified in `pyproject.toml` and will be installed automatically when you install the app.
 
@@ -151,6 +152,7 @@ For **outgoing** e-documents (generated from Sales Invoices):
 4. Click **Generate XML** to create the PEPPOL XML
 5. The XML is automatically validated
 6. The XML file is attached to the EDocument record
+7. Click **Preview EDocument** to view the formatted HTML preview
 
 ### Incoming EDocument
 
@@ -160,7 +162,8 @@ For **incoming** e-documents (imported XML files):
 1. Upload the XML file
 2. The app automatically detects the document type and profile
 3. The XML is validated against XSD and Schematron rules
-4. Click **Create Document** to parse the XML and create a Purchase Invoice
+4. Click **Preview EDocument** to view the formatted HTML preview of the document
+5. Click **Create Document** to parse the XML and create a Purchase Invoice
 
 ### Validation Errors
 
@@ -175,6 +178,21 @@ Common validation errors include:
 - XSD schema violations (element order, missing required fields)
 - Schematron business rule violations (BR-CO-15, BR-CO-17, etc.)
 - Missing required codes or invalid code values
+
+### EDocument Preview
+
+![EDocument Preview](img/Preview%20Edocument.png)
+
+For both **incoming** and **outgoing** e-documents with existing XML, you can preview the XML content as formatted HTML:
+
+1. Ensure the EDocument has XML attached (generate it first if needed using **Generate XML**)
+2. Click **Preview EDocument** to view the formatted HTML preview
+3. The preview displays the invoice/credit note in a human-readable format using XSLT transformations
+4. The HTML preview includes proper styling and formatting for easy reading
+
+The preview functionality uses profile-specific XSLT stylesheets to transform the UBL XML into styled HTML, making it easy to verify the document content before sending or processing.
+
+**Note:** The Preview button only appears when XML files are attached to the document. Use **Generate XML** first for outgoing documents.
 
 ## Usage
 
@@ -204,7 +222,8 @@ To create an outgoing e-document, you need to create an **EDocument** record:
 5. Select the **EDocument Profile** (e.g., "PEPPOL")
 6. Click **Generate XML** - this will create the PEPPOL XML and attach it to the document
 7. The XML is automatically validated against XSD and Schematron rules
-8. Click **Validate XML** - this will validate the PEPPOL XML.
+8. Click **Preview EDocument** - this will show an HTML preview of the generated XML
+9. Click **Validate XML** - this will validate the PEPPOL XML.
 
 The following fields of the **Sales Invoice** are currently considered for the e-document:
 
@@ -285,6 +304,7 @@ The app follows a modular, profile-based architecture:
 - **`generator.py`**: Converts ERPNext invoice data to UBL 2.1 XML
 - **`parser.py`**: Parses UBL 2.1 XML and creates ERPNext documents
 - **`validator.py`**: XSD and Schematron validation
+- **`preview.py`**: XSLT-based HTML preview generation
 - **`profiles/`**: Profile-specific implementations (PEPPOL, etc.)
 
 ### Profile System
@@ -298,6 +318,7 @@ Each profile defines:
 - Generator function (creates XML from ERPNext data)
 - Parser function (creates ERPNext data from XML)
 - Validator function (validates XML)
+- Preview function (converts XML to HTML using XSLT)
 - Profile identifier (for automatic detection)
 
 ## Contributing

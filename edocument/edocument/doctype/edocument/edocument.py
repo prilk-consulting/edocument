@@ -325,11 +325,30 @@ class EDocument(Document):
 					f"Error detecting profile from XML in on_update for EDocument {self.name}: {e!s}"
 				)
 
+	@frappe.whitelist()
+	def generate_preview(self) -> str:
+		"""
+		Generate HTML preview from attached XML file using profile-specific transformation.
+		Returns HTML string ready for display in HTML field.
+		"""
+		if not self.name:
+			frappe.throw(_("Document name is required"))
+
+		# Get XML bytes
+		xml_bytes = self._get_xml_from_attached_files()
+
+		if not xml_bytes:
+			frappe.throw(_("No XML content found"))
+
+		# Generate HTML preview using the preview module
+		from edocument.preview import get_xml_preview
+
+		return get_xml_preview(xml_bytes, self.edocument_profile)
+
 	def _get_xml_from_attached_files(self) -> bytes:
 		"""
 		Get XML bytes from the most recently attached XML file.
-		Both uploaded and generated XML files are attached to the document.
-		We only need the last/most recent XML file.
+		Follows standard Frappe pattern for file handling.
 
 		Returns:
 			bytes: XML content as bytes
@@ -337,59 +356,12 @@ class EDocument(Document):
 		Raises:
 			ValueError: If no XML file found or file cannot be read
 		"""
-		# If xml_file field is set, try to get file by file_url first
-		# This handles cases where file is uploaded but not yet attached
-		if self.xml_file:
-			# Try to find file by file_url (may be attached or not yet attached)
-			# First try attached to this document
-			if self.name:
-				file_doc = frappe.db.get_value(
-					"File",
-					{
-						"file_url": self.xml_file,
-						"attached_to_doctype": "EDocument",
-						"attached_to_name": self.name,
-					},
-					"name",
-					as_dict=True,
-				)
-				if file_doc:
-					try:
-						file_doc_obj = frappe.get_doc("File", file_doc.name)
-						content = file_doc_obj.get_content()
-						if isinstance(content, str):
-							return content.encode("utf-8")
-						return content
-					except Exception as e:
-						frappe.log_error(
-							f"Error reading file {file_doc.name}: {e!s}", "EDocument File Read Error"
-						)
-						raise ValueError(f"Cannot read file: {e!s}")
-
-			# If not found attached, try to find by file_url only (might not be attached yet)
-			file_doc = frappe.db.get_value("File", {"file_url": self.xml_file}, "name", as_dict=True)
-			if file_doc:
-				try:
-					file_doc_obj = frappe.get_doc("File", file_doc.name)
-					content = file_doc_obj.get_content()
-					if isinstance(content, str):
-						return content.encode("utf-8")
-					return content
-				except Exception as e:
-					frappe.log_error(
-						f"Error reading file {file_doc.name}: {e!s}", "EDocument File Read Error"
-					)
-					raise ValueError(f"Cannot read file: {e!s}")
-
-		# Get only the most recently created XML file (last one)
-		# Only search if document has a name (not a new unsaved document)
-		if not self.name:
-			raise ValueError("Document must be saved before reading XML file.")
-
-		xml_files = frappe.get_all(
+		# Get attached XML files (standard Frappe pattern)
+		file_docs = frappe.get_all(
 			"File",
+			fields=["name"],
 			filters={
-				"attached_to_doctype": "EDocument",
+				"attached_to_doctype": self.doctype,
 				"attached_to_name": self.name,
 				"file_name": ["like", "%.xml"],
 			},
@@ -397,22 +369,21 @@ class EDocument(Document):
 			limit=1,
 		)
 
-		if not xml_files:
-			raise ValueError("No XML file found. Please upload an XML file or generate XML first.")
+		if not file_docs:
+			frappe.throw(_("No XML file found. Please upload an XML file or generate XML first."))
 
-		# Get the XML file content
 		try:
-			file_doc = frappe.get_doc("File", xml_files[0].name)
+			file_doc = frappe.get_doc("File", file_docs[0].name)
 			content = file_doc.get_content()
-			# Ensure we always return bytes (get_content() might return str for text files)
+			if not content:
+				frappe.throw(_("XML file has no content"))
+			# Ensure we return bytes for XML parsing
 			if isinstance(content, str):
 				return content.encode("utf-8")
 			return content
 		except Exception as e:
-			frappe.log_error(
-				f"Error reading XML file {xml_files[0].name}: {e!s}", "EDocument File Read Error"
-			)
-			raise ValueError(f"Cannot read XML file: {e!s}")
+			frappe.log_error(f"Error reading XML file {file_docs[0].name}: {e!s}")
+			frappe.throw(_("Cannot read XML file: {0}").format(str(e)))
 
 	@frappe.whitelist()
 	def create_and_save_document(self):
