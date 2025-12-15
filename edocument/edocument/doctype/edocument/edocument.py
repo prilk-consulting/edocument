@@ -342,6 +342,7 @@ class EDocument(Document):
 
 		# Generate HTML preview using the preview module
 		from edocument.preview import get_xml_preview
+
 		return get_xml_preview(xml_bytes, self.edocument_profile)
 
 	def _get_xml_from_attached_files(self) -> bytes:
@@ -362,10 +363,10 @@ class EDocument(Document):
 			filters={
 				"attached_to_doctype": self.doctype,
 				"attached_to_name": self.name,
-				"file_name": ["like", "%.xml"]
+				"file_name": ["like", "%.xml"],
 			},
 			order_by="creation desc",
-			limit=1
+			limit=1,
 		)
 
 		if not file_docs:
@@ -419,10 +420,6 @@ class EDocument(Document):
 			self.save()
 			frappe.log_error(f"Error creating document from XML for EDocument {self.name}: {error_msg}")
 			frappe.throw(_("Error creating document: {0}").format(error_msg))
-
-
-
-
 
 
 @frappe.whitelist()

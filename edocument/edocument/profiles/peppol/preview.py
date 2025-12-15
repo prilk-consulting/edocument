@@ -46,15 +46,9 @@ def preview_peppol_xml(xml_bytes, edocument_profile):
 def _get_peppol_stylesheet_path():
 	"""Get the path to the official PEPPOL stylesheet."""
 	# Path: edocument/edocument/profiles/peppol/peppol-bis-invoice-3/stylesheet/stylesheet-ubl.xslt
-	xslt_path = (
-		Path(__file__).parent
-		/ "peppol-bis-invoice-3"
-		/ "stylesheet"
-		/ "stylesheet-ubl.xslt"
-	)
+	xslt_path = Path(__file__).parent / "peppol-bis-invoice-3" / "stylesheet" / "stylesheet-ubl.xslt"
 
 	if not xslt_path.exists():
 		frappe.throw(_("PEPPOL stylesheet not found at: {0}").format(str(xslt_path)))
 
 	return xslt_path
-
