@@ -129,7 +129,6 @@ def create_peppol_profile():
 		profile = frappe.get_doc(
 			{
 				"doctype": "EDocument Profile",
-				"name": profile_name,
 				"identifier_namespace": "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2",
 				"identifier_element_name": "CustomizationID",
 				"identifier_value": "urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0",
@@ -143,6 +142,7 @@ def create_peppol_profile():
 				"action_on_validation_error_during_submit": 0,
 			}
 		)
+		profile.name = profile_name
 		profile.insert(ignore_permissions=True)
 		frappe.db.commit()
 	except Exception as e:
