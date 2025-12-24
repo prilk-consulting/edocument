@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-    name: Server (Frappe v16, Python 3.12)
+    name: Server (Frappe v16, Python 3.14)
 
     services:
       redis-cache:
@@ -46,7 +46,8 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.14'
+          allow-prereleases: true
 
       - name: Setup Node
         uses: actions/setup-node@v4
