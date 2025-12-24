@@ -4,21 +4,21 @@
  "creation": "2025-11-08 06:54:38.804475",
  "doctype": "DocType",
  "engine": "InnoDB",
-  "field_order": [
+ "field_order": [
   "identifier_value",
   "identifier_element_name",
   "identifier_namespace",
   "sales_invoice_settings_section",
-  "validate_sales_invoice_on_save",
-  "validate_sales_invoice_on_submit",
+  "edocument_generation_on_save",
+  "edocument_generation_on_submit",
   "column_break_pbbd",
-  "action_on_validation_error_during_save",
-  "action_on_validation_error_during_submit",
+  "ignore_validation_error_for_edocument_generation",
   "schema_files_section",
   "generator_path",
   "validator_path",
   "parser_path",
-  "preview_path"
+  "preview_path",
+  "detector_path"
  ],
  "fields": [
   {
@@ -38,30 +38,6 @@
    "fieldname": "identifier_namespace",
    "fieldtype": "Data",
    "label": "Identifier Namespace"
-  },
-  {
-   "default": "0",
-   "fieldname": "validate_sales_invoice_on_save",
-   "fieldtype": "Check",
-   "label": "Validate Sales Invoice on Save"
-  },
-  {
-   "default": "0",
-   "fieldname": "validate_sales_invoice_on_submit",
-   "fieldtype": "Check",
-   "label": "Validate Sales Invoice on Submit"
-  },
-  {
-   "default": "0",
-   "fieldname": "action_on_validation_error_during_save",
-   "fieldtype": "Check",
-   "label": "Action on Validation Error during Save"
-  },
-  {
-   "default": "0",
-   "fieldname": "action_on_validation_error_during_submit",
-   "fieldtype": "Check",
-   "label": "Action on Validation Error during Submit"
   },
   {
    "fieldname": "sales_invoice_settings_section",
@@ -96,12 +72,36 @@
    "fieldname": "preview_path",
    "fieldtype": "Data",
    "label": "Preview Path"
+  },
+  {
+   "description": "Path to function that detects EDocument field values from incoming XML (e.g., company, supplier). Function signature: detect_edocument_fields(xml_bytes) -> dict",
+   "fieldname": "detector_path",
+   "fieldtype": "Data",
+   "label": "Detector Path"
+  },
+  {
+   "default": "0",
+   "fieldname": "edocument_generation_on_save",
+   "fieldtype": "Check",
+   "label": "EDocument generation on Save"
+  },
+  {
+   "default": "0",
+   "fieldname": "edocument_generation_on_submit",
+   "fieldtype": "Check",
+   "label": "EDocument generation on Submit"
+  },
+  {
+   "default": "0",
+   "fieldname": "ignore_validation_error_for_edocument_generation",
+   "fieldtype": "Check",
+   "label": "Ignore Validation Error for EDocument generation"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-11-17 05:42:33.029548",
+ "modified": "2025-12-24 08:00:17.647010",
  "modified_by": "Administrator",
  "module": "Edocument",
  "name": "EDocument Profile",

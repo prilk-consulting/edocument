@@ -13,6 +13,7 @@
   "company",
   "column_break_avdv",
   "direction",
+  "reference",
   "edocument_reference_section",
   "edocument_source_type",
   "edocument_source_document",
@@ -132,17 +133,21 @@
    "label": "Preview"
   },
   {
+   "columns": 12,
    "fieldname": "edocument_preview",
    "fieldtype": "HTML",
-   "label": "EDocument Preview",
-   "hidden": 0,
-   "columns": 12
+   "label": "EDocument Preview"
+  },
+  {
+   "fieldname": "reference",
+   "fieldtype": "Data",
+   "label": "Reference"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-12-15 01:48:10.306390",
+ "modified": "2025-12-24 04:57:24.498021",
  "modified_by": "Administrator",
  "module": "Edocument",
  "name": "EDocument",

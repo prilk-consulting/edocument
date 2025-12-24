@@ -9,6 +9,10 @@ def after_install():
 	setup_peppol_codes()
 
 
+def after_migrate():
+	create_custom_fields(get_custom_fields())
+
+
 def get_custom_fields():
 	return {
 		"Company": [
@@ -114,6 +118,46 @@ def get_custom_fields():
 				"fetch_from": "customer.edocument_profile",
 				"fetch_if_empty": 1,
 			},
+			{
+				"fieldname": "edocument",
+				"label": "EDocument",
+				"fieldtype": "Link",
+				"options": "EDocument",
+				"insert_after": "edocument_profile",
+				"read_only": 1,
+			},
+			{
+				"fieldname": "edocument_status",
+				"label": "EDocument Status",
+				"fieldtype": "Data",
+				"insert_after": "edocument",
+				"fetch_from": "edocument.status",
+				"read_only": 1,
+			},
+		],
+		"Purchase Invoice": [
+			{
+				"fieldname": "edocument_tab",
+				"label": "EDocument",
+				"fieldtype": "Tab Break",
+				"insert_after": "terms",
+			},
+			{
+				"fieldname": "edocument",
+				"label": "EDocument",
+				"fieldtype": "Link",
+				"options": "EDocument",
+				"insert_after": "edocument_tab",
+				"read_only": 1,
+			},
+			{
+				"fieldname": "edocument_status",
+				"label": "EDocument Status",
+				"fieldtype": "Data",
+				"insert_after": "edocument",
+				"fetch_from": "edocument.status",
+				"read_only": 1,
+			},
 		],
 	}
 
@@ -140,6 +184,7 @@ def create_peppol_profile():
 				"parser_path": "edocument.edocument.profiles.peppol.parser.parse_peppol_xml",
 				"validator_path": "edocument.edocument.profiles.peppol.validator.validate_peppol_xml",
 				"preview_path": "edocument.edocument.profiles.peppol.preview.preview_peppol_xml",
+				"detector_path": "edocument.edocument.profiles.peppol.detector.detect_edocument_fields",
 				"validate_sales_invoice_on_save": 0,
 				"validate_sales_invoice_on_submit": 0,
 				"action_on_validation_error_during_save": 0,
