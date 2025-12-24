@@ -87,6 +87,7 @@ app_license = "gpl-3.0"
 
 # before_install = "edocument.install.before_install"
 after_install = "edocument.install.after_install"
+after_migrate = "edocument.install.after_migrate"
 
 # Uninstallation
 # ------------
@@ -134,7 +135,11 @@ after_install = "edocument.install.after_install"
 
 doc_events = {
 	"Sales Invoice": {
-		"on_submit": "edocument.edocument.custom.sales_invoice.on_submit",
+		"on_update": "edocument.edocument.custom.sales_invoice.on_update",
+		"before_submit": "edocument.edocument.custom.sales_invoice.before_submit",
+	},
+	"Purchase Invoice": {
+		"on_update": "edocument.edocument.custom.purchase_invoice.on_update",
 	},
 }
 
