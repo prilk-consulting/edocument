@@ -77,10 +77,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
 
-      - name: Install MariaDB Client
+      - name: Install System Dependencies
         run: |
           sudo apt update
-          sudo apt-get install mariadb-client
+          sudo apt-get install mariadb-client libxml2-dev libxslt-dev
 
       - name: Setup
         run: |
@@ -92,9 +92,11 @@ jobs:
       - name: Install
         working-directory: /home/runner/frappe-bench
         run: |
+          bench get-app erpnext --branch version-15
           bench get-app edocument $GITHUB_WORKSPACE
           bench setup requirements --dev
           bench new-site --db-root-password root --admin-password admin test_site
+          bench --site test_site install-app erpnext
           bench --site test_site install-app edocument
           bench build
         env:
