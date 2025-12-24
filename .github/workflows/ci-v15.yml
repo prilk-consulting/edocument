@@ -1,14 +1,15 @@
-name: CI
+name: CI (v15)
 
 on:
   push:
     branches:
-      - develop
       - version-15
   pull_request:
+    branches:
+      - version-15
 
 concurrency:
-  group: develop-edocument-${{ github.event.number }}
+  group: v15-edocument-${{ github.event.number }}
   cancel-in-progress: true
 
 jobs:
@@ -16,14 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix:
-        python-version: ['3.10', '3.12']
-        frappe-branch: ['version-15', 'develop']
-        exclude:
-          # Frappe v15 doesn't support Python 3.12
-          - python-version: '3.12'
-            frappe-branch: 'version-15'
-    name: Server (Python ${{ matrix.python-version }}, Frappe ${{ matrix.frappe-branch }})
+    name: Server (Frappe v15, Python 3.10)
 
     services:
       redis-cache:
@@ -54,7 +48,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: '${{ matrix.python-version }}'
+          python-version: '3.10'
 
       - name: Setup Node
         uses: actions/setup-node@v3
@@ -91,18 +85,20 @@ jobs:
       - name: Setup
         run: |
           pip install frappe-bench
-          bench init --skip-redis-config-generation --skip-assets --frappe-branch ${{ matrix.frappe-branch }} --python "$(which python)" ~/frappe-bench
+          bench init --skip-redis-config-generation --skip-assets --python "$(which python)" ~/frappe-bench
+          cd ~/frappe-bench
+          cd apps/frappe
+          git checkout version-15
+          cd ~/frappe-bench
           mariadb --host 127.0.0.1 --port 3306 -u root -proot -e "SET GLOBAL character_set_server = 'utf8mb4'"
           mariadb --host 127.0.0.1 --port 3306 -u root -proot -e "SET GLOBAL collation_server = 'utf8mb4_unicode_ci'"
 
       - name: Install
         working-directory: /home/runner/frappe-bench
         run: |
-          bench get-app erpnext
           bench get-app edocument $GITHUB_WORKSPACE
           bench setup requirements --dev
           bench new-site --db-root-password root --admin-password admin test_site
-          bench --site test_site install-app erpnext
           bench --site test_site install-app edocument
           bench build
         env:
@@ -115,4 +111,3 @@ jobs:
           bench --site test_site run-tests --app edocument
         env:
           TYPE: server
-
