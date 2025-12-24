@@ -76,10 +76,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
 
-      - name: Install MariaDB Client
+      - name: Install System Dependencies
         run: |
           sudo apt update
-          sudo apt-get install mariadb-client
+          sudo apt-get install mariadb-client libxml2-dev libxslt-dev
 
       - name: Setup
         run: |
