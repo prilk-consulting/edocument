@@ -347,7 +347,6 @@ class EDocument(Document):
 					detected_profile = _detect_profile_from_xml(xml_bytes)
 					if detected_profile and detected_profile != self.edocument_profile:
 						self.db_set("edocument_profile", detected_profile, update_modified=False)
-						self.edocument_profile = detected_profile  # Update local value for field detection
 			except Exception as e:
 				frappe.log_error(
 					f"Error detecting profile from XML in on_update for EDocument {self.name}: {e!s}"
