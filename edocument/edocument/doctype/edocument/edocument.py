@@ -247,17 +247,20 @@ class EDocument(Document):
 		# - Incoming: if XML file exists but no source document (uploaded/received XML)
 		if self.edocument_source_document:
 			self.direction = "Outgoing"
-		elif self.xml_file:
+		elif self.xml_file or self._has_xml_file():
 			self.direction = "Incoming"
 		# If neither condition is met, keep existing value or default to "Outgoing"
 		elif not self.direction:
 			self.direction = "Outgoing"
 
+		# Check if XML is available (either via xml_file field or attached files)
+		has_xml = self.xml_file or self._has_xml_file()
+
 		# Auto-detect profile from XML if:
 		xml_file_changed = self.has_value_changed("xml_file")
-		should_detect = (xml_file_changed or not self.edocument_profile) and self.xml_file
+		should_detect_profile = (xml_file_changed or not self.edocument_profile) and has_xml
 
-		if should_detect:
+		if should_detect_profile:
 			# Try to detect profile from XML
 			try:
 				xml_bytes = self._get_xml_from_attached_files()
@@ -271,6 +274,24 @@ class EDocument(Document):
 				frappe.log_error(
 					f"Error detecting profile from XML for EDocument {self.name if self.name else 'NEW'}: {error_msg}\nTraceback: {frappe.get_traceback()}",
 					"EDocument Profile Detection Error",
+				)
+
+		# Auto-detect EDocument fields (company, etc.) from XML using profile-specific detector
+		if self.edocument_profile and has_xml and not self.company:
+			try:
+				xml_bytes = self._get_xml_from_attached_files()
+				if xml_bytes:
+					from edocument.edocument.detector import get_edocument_fields
+
+					detected_fields = get_edocument_fields(xml_bytes, self.edocument_profile)
+					# Set detected fields on the document
+					for field, value in detected_fields.items():
+						if hasattr(self, field) and not getattr(self, field):
+							setattr(self, field, value)
+			except Exception as e:
+				frappe.log_error(
+					f"Error detecting fields from XML for EDocument {self.name if self.name else 'NEW'}: {e!s}",
+					"EDocument Field Detection Error",
 				)
 
 		if self.edocument_source_document and self.edocument_profile and not self.xml_file:
@@ -299,31 +320,71 @@ class EDocument(Document):
 					f"Error during automatic XML validation for EDocument {self.name}: {error_msg}"
 				)
 
+			# If caller requested to block on validation error, throw before document is saved
+			if (
+				getattr(frappe.flags, "block_on_validation_error", False)
+				and self.status == "Validation Failed"
+			):
+				frappe.throw(_("EDocument validation failed: {0}").format(self.error or _("Unknown error")))
+
 	def on_update(self):
 		"""
 		Called after document is saved.
-		Detect profile from XML if it wasn't detected in before_save (e.g., file attached via on_update hook).
+		Detect profile and fields from XML if not detected in before_save (e.g., file attached separately).
 		"""
+		# Check if XML is available (either via xml_file field or attached files)
+		has_xml = self.xml_file or self._has_xml_file()
+
 		# Auto-detect profile from XML if:
 		xml_file_changed = self.has_value_changed("xml_file")
-		should_detect = (xml_file_changed or not self.edocument_profile) and self.xml_file
+		should_detect_profile = (xml_file_changed or not self.edocument_profile) and has_xml
 
-		if should_detect:
+		if should_detect_profile:
 			# Try to detect profile from XML
 			try:
 				xml_bytes = self._get_xml_from_attached_files()
 				if xml_bytes:
 					detected_profile = _detect_profile_from_xml(xml_bytes)
-					if detected_profile:
-						# Update profile and save (only if different from current)
-						if detected_profile != self.edocument_profile:
-							self.db_set("edocument_profile", detected_profile, update_modified=False)
-							frappe.db.commit()
+					if detected_profile and detected_profile != self.edocument_profile:
+						self.db_set("edocument_profile", detected_profile, update_modified=False)
 			except Exception as e:
-				# If detection fails, log but don't block save
 				frappe.log_error(
 					f"Error detecting profile from XML in on_update for EDocument {self.name}: {e!s}"
 				)
+
+		# Auto-detect EDocument fields (company, etc.) from XML using profile-specific detector
+		if self.edocument_profile and has_xml and not self.company:
+			try:
+				xml_bytes = self._get_xml_from_attached_files()
+				if xml_bytes:
+					from edocument.edocument.detector import get_edocument_fields
+
+					detected_fields = get_edocument_fields(xml_bytes, self.edocument_profile)
+					# Update detected fields directly in database
+					for field, value in detected_fields.items():
+						if hasattr(self, field) and not getattr(self, field):
+							self.db_set(field, value, update_modified=False)
+			except Exception as e:
+				frappe.log_error(
+					f"Error detecting fields from XML in on_update for EDocument {self.name}: {e!s}"
+				)
+
+		# Update source document with EDocument reference and status (for outgoing documents)
+		if self.direction == "Outgoing" and self.edocument_source_type and self.edocument_source_document:
+			frappe.db.set_value(
+				self.edocument_source_type,
+				self.edocument_source_document,
+				"edocument",
+				self.name,
+				update_modified=False,
+			)
+			frappe.db.set_value(
+				self.edocument_source_type,
+				self.edocument_source_document,
+				"edocument_status",
+				self.status,
+				update_modified=False,
+			)
 
 	@frappe.whitelist()
 	def generate_preview(self) -> str:
@@ -394,6 +455,7 @@ class EDocument(Document):
 		"""
 		try:
 			# Use the standalone create_document function to get the document
+			# (edocument and edocument_status are set in create_document)
 			doc = create_document(self.name, target_doc=None)
 
 			# Save the document
@@ -465,6 +527,10 @@ def create_document(source_name, target_doc=None):
 	doctype = document_data["doctype"]
 	doc = frappe.new_doc(doctype)
 	doc.update(document_data)
+
+	# Set EDocument reference on target document
+	doc.edocument = source_name
+	doc.edocument_status = edocument.status
 
 	# Set missing values before returning
 	doc.set_missing_values()

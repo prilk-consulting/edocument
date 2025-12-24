@@ -1,10 +1,9 @@
-name: CI
+name: CI (v16)
 
 on:
   push:
     branches:
       - develop
-      - version-15
   pull_request:
 
 concurrency:
@@ -16,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-    name: Server
+    name: Server (Frappe v16, Python 3.14)
 
     services:
       redis-cache:
@@ -33,7 +32,7 @@ jobs:
           MYSQL_ROOT_PASSWORD: root
         ports:
           - 3306:3306
-        options: --health-cmd="mariadb-admin ping" --health-interval=5s --health-timeout=2s --health-retries=3
+        options: --health-cmd="mariadb-admin ping -u root -proot" --health-interval=5s --health-timeout=2s --health-retries=3
 
     steps:
       - name: Clone
@@ -45,14 +44,15 @@ jobs:
           grep -rn "def test" > /dev/null
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.14'
+          allow-prereleases: true
 
       - name: Setup Node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 24
           check-latest: true
 
       - name: Cache pip
@@ -76,10 +76,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
 
-      - name: Install MariaDB Client
+      - name: Install System Dependencies
         run: |
           sudo apt update
-          sudo apt-get install mariadb-client
+          sudo apt-get install mariadb-client libxml2-dev libxslt-dev
 
       - name: Setup
         run: |
@@ -108,4 +108,3 @@ jobs:
           bench --site test_site run-tests --app edocument
         env:
           TYPE: server
-

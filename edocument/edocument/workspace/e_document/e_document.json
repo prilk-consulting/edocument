@@ -1,0 +1,159 @@
+{
+ "app": "edocument",
+ "charts": [],
+ "content": "[{\"id\":\"edoc_shortcut_new\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"New eDocument\",\"col\":4}},{\"id\":\"edoc_shortcut_list\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"eDocument List\",\"col\":4}},{\"id\":\"DT9YXyyZp0\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Error eDocument List\",\"col\":4}},{\"id\":\"R1KeXo8Mp7\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Outgoing eDocument List\",\"col\":4}},{\"id\":\"rbAkFnmWi0\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Incoming eDocument List\",\"col\":4}},{\"id\":\"edoc_shortcut_profile\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"eDocument Profile\",\"col\":4}},{\"id\":\"B-iVFgkFet\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Code List\",\"col\":4}},{\"id\":\"leF4j_bJtu\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Common Code\",\"col\":4}},{\"id\":\"ptbthUSk1q\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"eDocument Integration\",\"col\":3}},{\"id\":\"edoc_spacer\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"edoc_card_documents\",\"type\":\"card\",\"data\":{\"card_name\":\"Documents\",\"col\":6}},{\"id\":\"edoc_card_setup\",\"type\":\"card\",\"data\":{\"card_name\":\"Setup\",\"col\":6}},{\"id\":\"wqsVRES_Nx\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Install eDocument Integration</span>\",\"col\":12}},{\"id\":\"X7suATPjqz\",\"type\":\"paragraph\",\"data\":{\"text\":\"If you would like to send and received message through the PEPPOL network, Make sure to install Edocument integration app from <a href=\\\"https://github.com/prilk-consulting/edocument_integration\\\">github</a>&nbsp;or <a href=\\\"https://cloud.frappe.io/marketplace/apps/edocument_integration\\\">frappe marketplace</a>\",\"col\":12}}]",
+ "creation": "2025-12-22 00:00:00",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "file-text",
+ "idx": 0,
+ "indicator_color": "green",
+ "is_hidden": 0,
+ "label": "E-Document",
+ "links": [
+  {
+   "description": "E-Documents generated from Sales Invoices or received from external sources",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Documents",
+   "link_count": 1,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "eDocument",
+   "link_count": 0,
+   "link_to": "EDocument",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "description": "Configure eDocument profiles and provider integrations",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Setup",
+   "link_count": 2,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "eDocument Profile",
+   "link_count": 0,
+   "link_to": "EDocument Profile",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "dependencies": "EDocument Integration Settings",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "eDocument Integration Settings",
+   "link_count": 0,
+   "link_to": "EDocument Integration Settings",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2025-12-24 09:29:05.717913",
+ "modified_by": "Administrator",
+ "module": "Edocument",
+ "name": "E-Document",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "restrict_to_domain": "",
+ "roles": [],
+ "sequence_id": 0.0,
+ "shortcuts": [
+  {
+   "color": "Grey",
+   "doc_view": "New",
+   "label": "New eDocument",
+   "link_to": "EDocument",
+   "stats_filter": "[]",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "eDocument List",
+   "link_to": "EDocument",
+   "stats_filter": "[]",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Incoming eDocument List",
+   "link_to": "EDocument",
+   "stats_filter": "[[\"EDocument\",\"direction\",\"=\",\"Incoming\",false]]",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Error eDocument List",
+   "link_to": "EDocument",
+   "stats_filter": "[[\"EDocument\",\"status\",\"in\",[\"Transmission Failed\",\"Validation Failed\",null],false]]",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Code List",
+   "link_to": "Code List",
+   "stats_filter": "[]",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Common Code",
+   "link_to": "Common Code",
+   "stats_filter": "[]",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "eDocument Integration",
+   "link_to": "EDocument Integration Settings",
+   "stats_filter": "[]",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "eDocument Profile",
+   "link_to": "EDocument Profile",
+   "stats_filter": "[]",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Outgoing eDocument List",
+   "link_to": "EDocument",
+   "stats_filter": "[[\"EDocument\",\"direction\",\"=\",\"Outgoing\",false]]",
+   "type": "DocType"
+  }
+ ],
+ "title": "E-Document",
+ "type": "Workspace"
+}
