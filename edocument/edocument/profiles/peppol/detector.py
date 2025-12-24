@@ -55,8 +55,7 @@ def detect_edocument_fields(xml_bytes):
 
 	except Exception as e:
 		frappe.log_error(
-			f"Failed to detect EDocument fields from PEPPOL XML: {e!s}",
-			"PEPPOL Field Detection Error"
+			f"Failed to detect EDocument fields from PEPPOL XML: {e!s}", "PEPPOL Field Detection Error"
 		)
 		return {}
 
@@ -83,11 +82,7 @@ def _detect_company_from_buyer(root):
 	buyer_endpoint = buyer_party.find(".//cbc:EndpointID", UBL_NAMESPACES)
 	if buyer_endpoint is not None and buyer_endpoint.text:
 		endpoint_value = buyer_endpoint.text.strip()
-		company = frappe.db.get_value(
-			"Company",
-			{"edocument_electronic_address": endpoint_value},
-			"name"
-		)
+		company = frappe.db.get_value("Company", {"edocument_electronic_address": endpoint_value}, "name")
 		if company:
 			return company
 
@@ -129,7 +124,9 @@ def _detect_country_from_seller(root):
 		return None
 
 	# Get country code from PostalAddress
-	country_code_elem = seller_party.find(".//cac:PostalAddress/cac:Country/cbc:IdentificationCode", UBL_NAMESPACES)
+	country_code_elem = seller_party.find(
+		".//cac:PostalAddress/cac:Country/cbc:IdentificationCode", UBL_NAMESPACES
+	)
 	if country_code_elem is not None and country_code_elem.text:
 		country_code = country_code_elem.text.strip()
 		# Look up country name from code

@@ -12,7 +12,11 @@ def _get_profile_settings(profile_name):
 	return frappe.db.get_value(
 		"EDocument Profile",
 		profile_name,
-		["edocument_generation_on_save", "edocument_generation_on_submit", "ignore_validation_error_for_edocument_generation"],
+		[
+			"edocument_generation_on_save",
+			"edocument_generation_on_submit",
+			"ignore_validation_error_for_edocument_generation",
+		],
 		as_dict=True,
 	)
 
@@ -42,8 +46,7 @@ def _create_edocument(doc, ignore_validation_error=False):
 		if not ignore_validation_error and edocument.status == "Validation Failed":
 			frappe.throw(
 				_("EDocument {0} validation failed: {1}").format(
-					frappe.bold(edocument.name),
-					edocument.error or _("Unknown error")
+					frappe.bold(edocument.name), edocument.error or _("Unknown error")
 				)
 			)
 		return edocument
@@ -87,8 +90,7 @@ def _create_edocument(doc, ignore_validation_error=False):
 	elif edocument.status == "Validation Failed":
 		frappe.msgprint(
 			_("EDocument {0} created with validation errors: {1}").format(
-				frappe.bold(edocument.name),
-				edocument.error or _("Unknown error")
+				frappe.bold(edocument.name), edocument.error or _("Unknown error")
 			),
 			indicator="orange",
 			alert=True,

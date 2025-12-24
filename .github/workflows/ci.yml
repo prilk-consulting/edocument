@@ -16,7 +16,14 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-    name: Server
+      matrix:
+        python-version: ['3.10', '3.12']
+        frappe-branch: ['version-15', 'develop']
+        exclude:
+          # Frappe v15 doesn't support Python 3.12
+          - python-version: '3.12'
+            frappe-branch: 'version-15'
+    name: Server (Python ${{ matrix.python-version }}, Frappe ${{ matrix.frappe-branch }})
 
     services:
       redis-cache:
@@ -47,7 +54,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: '${{ matrix.python-version }}'
 
       - name: Setup Node
         uses: actions/setup-node@v3

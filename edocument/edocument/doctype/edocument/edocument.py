@@ -321,10 +321,11 @@ class EDocument(Document):
 				)
 
 			# If caller requested to block on validation error, throw before document is saved
-			if getattr(frappe.flags, "block_on_validation_error", False) and self.status == "Validation Failed":
-				frappe.throw(
-					_("EDocument validation failed: {0}").format(self.error or _("Unknown error"))
-				)
+			if (
+				getattr(frappe.flags, "block_on_validation_error", False)
+				and self.status == "Validation Failed"
+			):
+				frappe.throw(_("EDocument validation failed: {0}").format(self.error or _("Unknown error")))
 
 	def on_update(self):
 		"""
