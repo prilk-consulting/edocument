@@ -5,8 +5,6 @@ on:
     branches:
       - version-15
   pull_request:
-    branches:
-      - version-15
 
 concurrency:
   group: v15-edocument-${{ github.event.number }}
