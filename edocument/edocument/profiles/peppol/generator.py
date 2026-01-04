@@ -456,6 +456,17 @@ class PEPPOLGenerator:
 		if not hasattr(self, "root") or self.root is None:
 			return
 
+		# Check if we have any payment information
+		has_payment_info = self.invoice.payment_terms_template or (
+			self.invoice.payment_schedule
+			and any(term.mode_of_payment for term in self.invoice.payment_schedule)
+		)
+
+		# Skip PaymentMeans if no payment information is available
+		# PaymentMeans has cardinality 0..n in Peppol BIS Billing 3.0, making it optional
+		if not has_payment_info:
+			return
+
 		# Add PaymentMeans
 		payment_means = ET.SubElement(self.root, f"{{{self.namespaces['cac']}}}PaymentMeans")
 
