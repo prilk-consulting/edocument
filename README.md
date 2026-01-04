@@ -19,15 +19,27 @@ This app provides a flexible framework for generating and parsing electronic doc
 
 ## Installation
 
-You can install this app using the [bench](https://github.com/frappe/bench) CLI:
+### Supported Versions
+
+| Frappe/ERPNext | Branch | Python | Node.js |
+|----------------|--------|--------|---------|
+| v15 | `version-15` | 3.10 | 18 |
+| v16 | `develop` | 3.14 | 24 |
+
+### Installation Steps
 
 ```bash
 cd $PATH_TO_YOUR_BENCH
-bench get-app https://github.com/prilk-consulting/edocument --branch develop
-bench install-app edocument
-```
 
-Please use a branch that matches the major version of ERPNext you are using. For example, `version-15` or `version-16`. If you are a developer contributing new features, you'll want to use the `develop` branch instead.
+# For Frappe/ERPNext v15
+bench get-app https://github.com/prilk-consulting/edocument --branch version-15
+
+# For Frappe/ERPNext v16 (develop)
+bench get-app https://github.com/prilk-consulting/edocument
+
+# Install on your site
+bench --site your-site install-app edocument
+```
 
 ## Dependencies
 
@@ -124,11 +136,23 @@ Configure EDocument settings in the **Supplier** master data:
 ![PEPPOL Profile Configuration](img/Peppol%20profile.png)
 
 The **EDocument Profile** defines the configuration for a specific e-document standard (e.g., PEPPOL). It includes:
-- **Identifier Values**: Used to detect the profile from XML (namespace, element name, value)
+
+**Identifier Settings** (used to detect the profile from XML):
+- **Identifier Namespace**: XML namespace where the identifier element is found
+- **Identifier Element Name**: Name of the XML element containing the profile identifier
+- **Identifier Value**: The value that uniquely identifies this profile
+
+**Function Paths**:
 - **Generator Path**: Function that generates XML from ERPNext documents
 - **Parser Path**: Function that parses XML into ERPNext documents
 - **Validator Path**: Function that validates XML against schemas and business rules
-- **Sales Invoice Settings**: Options for automatic validation on save/submit
+- **Preview Path**: Function that converts XML to HTML preview using XSLT
+- **Detector Path**: Function that auto-detects fields from incoming XML
+
+**Sales Invoice Settings**:
+- **EDocument generation on Save**: Automatically create EDocument when Sales Invoice is saved (draft)
+- **EDocument generation on Submit**: Automatically create EDocument when Sales Invoice is submitted
+- **Ignore Validation Error for EDocument generation**: Allow EDocument creation even if validation fails (shows warning instead of blocking)
 
 The PEPPOL profile is automatically created when you install the app.
 
@@ -140,6 +164,8 @@ In the **Sales Invoice**, you can:
 - Select an **EDocument Profile** (defaults from Customer if set)
 - When the invoice is submitted, an EDocument record is automatically created (if profile is set)
 - The EDocument can then be used to generate and validate the PEPPOL XML
+
+**Tip:** Use the **Customer Purchase Order** field to set the buyer's reference number. This field is mapped to the `BuyerReference` element in the PEPPOL e-document, which is often required by customers for invoice processing.
 
 ### Outgoing EDocument
 
@@ -206,10 +232,12 @@ Before using the app, you need to create an **EDocument Profile** that defines w
    - **Identifier Namespace**: `urn:oasis:names:specification:ubl:schema:xsd:Invoice-2`
    - **Identifier Element Name**: `CustomizationID`
    - **Identifier Value**: `urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0`
-4. Set the generator and parser paths:
-   - **Generator Path**: `edocument.edocument.profiles.peppol.generator.create_peppol_xml`
+4. Set the generator, parser, validator, preview, and detector paths:
+   - **Generator Path**: `edocument.edocument.profiles.peppol.generator.generate_peppol_xml`
    - **Parser Path**: `edocument.edocument.profiles.peppol.parser.parse_peppol_xml`
    - **Validator Path**: `edocument.edocument.profiles.peppol.validator.validate_peppol_xml`
+   - **Preview Path**: `edocument.edocument.profiles.peppol.preview.preview_peppol_xml`
+   - **Detector Path**: `edocument.edocument.profiles.peppol.detector.detect_edocument_fields`
 
 ### Sales Invoice
 
@@ -232,6 +260,7 @@ The following fields of the **Sales Invoice** are currently considered for the e
 - Invoice date
 - Due date (only for invoices, not credit notes)
 - Currency
+- **Customer Purchase Order** (used as BuyerReference in the e-document)
 - Company information (name, address, tax ID, electronic address)
 - Customer information (name, address, tax ID, electronic address)
 - Items (name, description, quantity, rate, net amount, tax rate)
@@ -319,7 +348,16 @@ Each profile defines:
 - Parser function (creates ERPNext data from XML)
 - Validator function (validates XML)
 - Preview function (converts XML to HTML using XSLT)
+- Detector function (auto-detects fields from incoming XML)
 - Profile identifier (for automatic detection)
+
+### Automatic Field Detection
+
+For incoming e-documents, the app automatically detects and populates fields using the profile's detector:
+
+- **Company**: Detected from buyer's EndpointID matching Company's electronic address
+- **Country**: Detected from seller's postal address country code
+- **Target Document Type**: Detected from XML root element (Invoice → Purchase Invoice, CreditNote → Purchase Invoice)
 
 ## Contributing
 
