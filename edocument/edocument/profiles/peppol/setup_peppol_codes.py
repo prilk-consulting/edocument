@@ -401,6 +401,7 @@ def create_erpnext_mappings():
 		("cm", "CMT"),
 		("Mm", "MMT"),
 		("mm", "MMT"),
+		("Hour", "HUR"),
 		("Hr", "HUR"),
 		("hr", "HUR"),
 		("Day", "DAY"),

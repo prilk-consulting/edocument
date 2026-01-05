@@ -456,6 +456,17 @@ class PEPPOLGenerator:
 		if not hasattr(self, "root") or self.root is None:
 			return
 
+		# Check if we have any payment information
+		has_payment_info = self.invoice.payment_terms_template or (
+			self.invoice.payment_schedule
+			and any(term.mode_of_payment for term in self.invoice.payment_schedule)
+		)
+
+		# Skip PaymentMeans if no payment information is available
+		# PaymentMeans has cardinality 0..n in Peppol BIS Billing 3.0, making it optional
+		if not has_payment_info:
+			return
+
 		# Add PaymentMeans
 		payment_means = ET.SubElement(self.root, f"{{{self.namespaces['cac']}}}PaymentMeans")
 
@@ -705,7 +716,17 @@ class PEPPOLGenerator:
 			charge_total.text = "0.00"
 			charge_total.set("currencyID", self.invoice.currency)
 
-		# Payable Amount (BT-112) - Amount due for payment
+		# Prepaid Amount (BT-113) - Sum of amounts already paid
+		# This is required when PayableAmount != TaxInclusiveAmount to satisfy BR-CO-16:
+		# PayableAmount = TaxInclusiveAmount - PrepaidAmount + RoundingAmount
+		if self.document_type != "CreditNote":
+			prepaid_value = flt(self.invoice.grand_total, 2) - flt(self.invoice.outstanding_amount, 2)
+			if prepaid_value > 0:
+				prepaid_amount = ET.SubElement(legal_total, f"{{{self.namespaces['cbc']}}}PrepaidAmount")
+				prepaid_amount.text = str(flt(prepaid_value, 2))
+				prepaid_amount.set("currencyID", self.invoice.currency)
+
+		# Payable Amount (BT-115) - Amount due for payment
 		# For credit notes, this should be negative (amount to be credited)
 		payable_amount = ET.SubElement(legal_total, f"{{{self.namespaces['cbc']}}}PayableAmount")
 		if self.document_type == "CreditNote":
