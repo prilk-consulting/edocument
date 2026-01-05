@@ -197,7 +197,7 @@ class EDocument(Document):
 		# Combine errors and warnings in the error field
 		error_text_parts = []
 		if error_msg:
-			error_text_parts.append(error_msg)
+			error_text_parts.append(f"Errors:\n{error_msg}")
 		if warnings:
 			warnings_text = "\n".join(warnings)
 			error_text_parts.append(f"Warnings:\n{warnings_text}")

@@ -162,17 +162,27 @@ def validate_xml_against_schematron_file(
 
 	# Parse SVRL report
 	root = objectify.fromstring(report.encode("utf-8"))
-	failed_asserts = root.xpath(
-		"//svrl:failed-assert/svrl:text",
-		namespaces={"svrl": "http://purl.oclc.org/dsdl/svrl"},
-	)
-	warnings = root.xpath(
-		"//svrl:successful-report/svrl:text",
-		namespaces={"svrl": "http://purl.oclc.org/dsdl/svrl"},
+	svrl_ns = {"svrl": "http://purl.oclc.org/dsdl/svrl"}
+
+	# Errors: failed-assert WITHOUT flag="warning" (fatal or no flag)
+	error_asserts = root.xpath(
+		"//svrl:failed-assert[not(@flag='warning')]/svrl:text",
+		namespaces=svrl_ns,
 	)
 
-	errors = [assertion.text.strip() for assertion in failed_asserts if assertion.text]
-	warnings = [warning.text.strip() for warning in warnings if warning.text]
+	# Warnings: failed-assert WITH flag="warning" + all successful-report
+	warning_asserts = root.xpath(
+		"//svrl:failed-assert[@flag='warning']/svrl:text",
+		namespaces=svrl_ns,
+	)
+	successful_reports = root.xpath(
+		"//svrl:successful-report/svrl:text",
+		namespaces=svrl_ns,
+	)
+
+	errors = [assertion.text.strip() for assertion in error_asserts if assertion.text]
+	warnings = [w.text.strip() for w in warning_asserts if w.text]
+	warnings.extend([r.text.strip() for r in successful_reports if r.text])
 
 	return errors, warnings
 
