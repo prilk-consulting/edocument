@@ -381,7 +381,7 @@ class PEPPOLGenerator:
 		tax_category = ET.SubElement(item_elem, f"{{{self.namespaces['cac']}}}ClassifiedTaxCategory")
 
 		category_id = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}ID")
-		category_id.text = "S"
+		category_id.text = self.get_vat_category_code(self.invoice, item=item)
 
 		item_tax_rate = self._get_item_tax_rate(item)
 		tax_percent = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}Percent")
@@ -441,11 +441,32 @@ class PEPPOLGenerator:
 
 			tax_category = ET.SubElement(tax_subtotal, f"{{{self.namespaces['cac']}}}TaxCategory")
 
+			# Get category code dynamically from first item with this rate
+			category_code = None
+			sample_item = None
+			for item in self.invoice.items:
+				if self._get_item_tax_rate(item) == rate:
+					sample_item = item
+					category_code = self.get_vat_category_code(self.invoice, item=item)
+					break
+
+			if not category_code:
+				category_code = "S"  # Fallback to standard
+
 			category_id = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}ID")
-			category_id.text = "S"
+			category_id.text = category_code
 
 			tax_percent = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}Percent")
 			tax_percent.text = str(flt(rate, 2))
+
+			# Add exemption reason text if category requires it (E, AE, G, O, K)
+			if category_code in ["E", "AE", "G", "O", "K"]:
+				exemption_text = self._get_exemption_reason_text(category_code)
+				if exemption_text:
+					exemption_reason = ET.SubElement(
+						tax_category, f"{{{self.namespaces['cbc']}}}TaxExemptionReason"
+					)
+					exemption_reason.text = exemption_text
 
 			tax_scheme = ET.SubElement(tax_category, f"{{{self.namespaces['cac']}}}TaxScheme")
 			scheme_id = ET.SubElement(tax_scheme, f"{{{self.namespaces['cbc']}}}ID")
@@ -614,17 +635,24 @@ class PEPPOLGenerator:
 			# Tax Category: Use the tax rate from invoice taxes
 			# Get the first non-Actual tax rate (usually VAT)
 			tax_rate = None
+			sample_tax = None
 			for tax in self.invoice.taxes:
 				if tax.charge_type != "Actual" and tax.rate:
 					tax_rate = tax.rate
+					sample_tax = tax
 					break
 
 			if tax_rate and tax_rate > 0:
 				tax_category = ET.SubElement(allowance_charge, f"{{{self.namespaces['cac']}}}TaxCategory")
 
+				# Get category code dynamically
+				category_code = (
+					self.get_vat_category_code(self.invoice, tax=sample_tax) if sample_tax else "S"
+				)
+
 				# Category ID
 				category_id = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}ID")
-				category_id.text = "S"
+				category_id.text = category_code
 
 				tax_percent = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}Percent")
 				tax_percent.text = str(flt(tax_rate, 2))
@@ -659,9 +687,12 @@ class PEPPOLGenerator:
 				if tax.rate and tax.rate > 0:
 					tax_category = ET.SubElement(allowance_charge, f"{{{self.namespaces['cac']}}}TaxCategory")
 
+					# Get category code dynamically
+					category_code = self.get_vat_category_code(self.invoice, tax=tax)
+
 					# Category ID
 					category_id = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}ID")
-					category_id.text = "S"
+					category_id.text = category_code
 
 					tax_percent = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}Percent")
 					tax_percent.text = str(flt(tax.rate, 2))
@@ -874,6 +905,7 @@ class PEPPOLGenerator:
 		if item:
 			lookup_records.extend(
 				[
+					("Item", getattr(item, "item_code", None)),
 					("Item Tax Template", getattr(item, "item_tax_template", None)),
 					("Account", getattr(item, "income_account", None)),
 				]
@@ -896,10 +928,40 @@ class PEPPOLGenerator:
 
 		lookup_records = [(doctype, name) for doctype, name in lookup_records if name]
 
-		# Get the VAT category code using CommonCodeRetriever
-		category_code = duty_tax_fee_category_codes.get(lookup_records)
+		# Check for explicit mapping only; fallback logic handles defaults below
+		category_code = duty_tax_fee_category_codes.get_code(lookup_records)
 
-		return category_code
+		if category_code:
+			return category_code
+
+		# Auto-detect Z (zero-rated) for 0% rates when no explicit mapping exists
+		tax_rate = None
+		if item:
+			tax_rate = self._get_item_tax_rate(item)
+		elif tax:
+			tax_rate = getattr(tax, "rate", None)
+
+		# 0% VAT line exists → Zero-rated (safe assumption, doesn't require exemption text)
+		if tax_rate is not None and flt(tax_rate) == 0:
+			return "Z"
+
+		# Default to S (standard) for everything else
+		return duty_tax_fee_category_codes.default_code or "S"
+
+	def _get_exemption_reason_text(self, category_code: str) -> str:
+		"""Get exemption reason text for PEPPOL validation.
+
+		Categories E, AE, G, O, K require either TaxExemptionReasonCode or TaxExemptionReason
+		per PEPPOL BIS business rules (BR-E-10, BR-AE-10, BR-G-10, BR-O-10, BR-IC-10).
+		"""
+		texts = {
+			"E": "Exempt from VAT",
+			"AE": "Reverse charge",
+			"G": "Export outside the EU",
+			"O": "Not subject to VAT",
+			"K": "Intra-community supply",
+		}
+		return texts.get(category_code, "")
 
 	def get_xml_bytes(self) -> bytes:
 		# Return the XML as bytes
