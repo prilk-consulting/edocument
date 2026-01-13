@@ -76,6 +76,16 @@ class PEPPOLGenerator:
 		document_type = DOCUMENT_TYPE_MAPPING.get(invoice_type_code, "Invoice")
 		return document_type
 
+	def _has_out_of_scope_items(self) -> bool:
+		"""Check if any invoice line has VAT category 'O' (Out of Scope).
+
+		Per PEPPOL BR-O-02: invoices with O items shall not contain VAT identifiers.
+		"""
+		for item in self.invoice.items:
+			if self.get_vat_category_code(self.invoice, item=item) == "O":
+				return True
+		return False
+
 	def create_einvoice(self):
 		# Create the PEPPOL XML document
 		try:
@@ -226,7 +236,8 @@ class PEPPOLGenerator:
 			else:
 				country_code.text = "DE"
 
-		if self.invoice.company_tax_id:
+		# BR-O-02: Omit VAT identifiers if any item is Out of Scope
+		if self.invoice.company_tax_id and not self._has_out_of_scope_items():
 			tax_scheme = ET.SubElement(party, f"{{{self.namespaces['cac']}}}PartyTaxScheme")
 			company_id = ET.SubElement(tax_scheme, f"{{{self.namespaces['cbc']}}}CompanyID")
 			company_id.text = self.invoice.company_tax_id
@@ -310,7 +321,8 @@ class PEPPOLGenerator:
 			else:
 				country_code.text = "DE"
 
-		if self.invoice.tax_id:
+		# BR-O-02: Omit VAT identifiers if any item is Out of Scope
+		if self.invoice.tax_id and not self._has_out_of_scope_items():
 			tax_scheme = ET.SubElement(party, f"{{{self.namespaces['cac']}}}PartyTaxScheme")
 			company_id = ET.SubElement(tax_scheme, f"{{{self.namespaces['cbc']}}}CompanyID")
 			company_id.text = self.invoice.tax_id
