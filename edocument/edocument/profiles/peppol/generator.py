@@ -392,12 +392,15 @@ class PEPPOLGenerator:
 
 		tax_category = ET.SubElement(item_elem, f"{{{self.namespaces['cac']}}}ClassifiedTaxCategory")
 
+		category_code = self.get_vat_category_code(self.invoice, item=item)
 		category_id = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}ID")
-		category_id.text = self.get_vat_category_code(self.invoice, item=item)
+		category_id.text = category_code
 
-		item_tax_rate = self._get_item_tax_rate(item)
-		tax_percent = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}Percent")
-		tax_percent.text = str(flt(item_tax_rate or 0, 2))
+		# BR-O-05: O lines shall not contain VAT rate; BR-E-05: E lines require rate = 0
+		if category_code != "O":
+			item_tax_rate = self._get_item_tax_rate(item) if category_code not in ("E",) else 0
+			tax_percent = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}Percent")
+			tax_percent.text = str(flt(item_tax_rate or 0, 2))
 
 		tax_scheme = ET.SubElement(tax_category, f"{{{self.namespaces['cac']}}}TaxScheme")
 		scheme_id = ET.SubElement(tax_scheme, f"{{{self.namespaces['cbc']}}}ID")
