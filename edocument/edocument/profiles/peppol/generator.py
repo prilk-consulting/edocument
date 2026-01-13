@@ -454,24 +454,11 @@ class PEPPOLGenerator:
 			taxable_amount.text = str(flt(data["taxable_amount"], 2))
 			taxable_amount.set("currencyID", self.invoice.currency)
 
-			# Use tax_amount_after_discount_amount directly (already correctly calculated by ERPNext)
 			tax_amount = ET.SubElement(tax_subtotal, f"{{{self.namespaces['cbc']}}}TaxAmount")
 			tax_amount.text = str(flt(data["tax_amount"], 2))
 			tax_amount.set("currencyID", self.invoice.currency)
 
 			tax_category = ET.SubElement(tax_subtotal, f"{{{self.namespaces['cac']}}}TaxCategory")
-
-			# Get category code dynamically from first item with this rate
-			category_code = None
-			sample_item = None
-			for item in self.invoice.items:
-				if self._get_item_tax_rate(item) == rate:
-					sample_item = item
-					category_code = self.get_vat_category_code(self.invoice, item=item)
-					break
-
-			if not category_code:
-				category_code = "S"  # Fallback to standard
 
 			category_id = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}ID")
 			category_id.text = category_code
@@ -481,7 +468,6 @@ class PEPPOLGenerator:
 				tax_percent = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}Percent")
 				tax_percent.text = str(flt(rate or 0, 2))
 
-			# Add exemption reason text if category requires it (E, AE, G, O, K)
 			if category_code in ["E", "AE", "G", "O", "K"]:
 				exemption_text = self._get_exemption_reason_text(category_code)
 				if exemption_text:
