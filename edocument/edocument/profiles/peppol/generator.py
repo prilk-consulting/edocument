@@ -408,26 +408,31 @@ class PEPPOLGenerator:
 		tax_amount.text = str(flt(self.invoice.total_taxes_and_charges, 2))
 		tax_amount.set("currencyID", self.invoice.currency)
 
-		# Group taxes by rate from items
-		# Calculate taxes directly from items to ensure all tax rates are captured correctly
-		tax_rates = {}
+		# Group taxes by (category_code, rate)
+		# O items are not subject to VAT - no rate needed; E items require rate=0
+		tax_groups = {}
 		for item in self.invoice.items:
-			rate = self._get_item_tax_rate(item)
+			category_code = self.get_vat_category_code(self.invoice, item=item)
 
-			if not rate or rate == 0:
-				continue
+			# O is not subject to VAT - no rate; E is exempt with rate=0
+			if category_code == "O":
+				rate = None
+			elif category_code == "E":
+				rate = 0
+			else:
+				rate = self._get_item_tax_rate(item) or 0
 
-			if rate not in tax_rates:
-				tax_rates[rate] = {"taxable_amount": 0, "tax_amount": 0}
+			key = (category_code, rate)
 
-			# Calculate tax amount for this item
-			# item.net_amount is already after item-level discounts
-			item_tax_amount = flt(item.net_amount) * rate / 100
-			tax_rates[rate]["tax_amount"] += item_tax_amount
-			tax_rates[rate]["taxable_amount"] += flt(item.net_amount)
+			if key not in tax_groups:
+				tax_groups[key] = {"taxable_amount": 0, "tax_amount": 0}
 
-		# Add TaxSubtotal for each rate
-		for rate, data in tax_rates.items():
+			item_tax_amount = flt(item.net_amount) * (rate or 0) / 100
+			tax_groups[key]["tax_amount"] += item_tax_amount
+			tax_groups[key]["taxable_amount"] += flt(item.net_amount)
+
+		# Add TaxSubtotal for each (category, rate) group
+		for (category_code, rate), data in tax_groups.items():
 			tax_subtotal = ET.SubElement(tax_total, f"{{{self.namespaces['cac']}}}TaxSubtotal")
 
 			taxable_amount = ET.SubElement(tax_subtotal, f"{{{self.namespaces['cbc']}}}TaxableAmount")
@@ -456,8 +461,10 @@ class PEPPOLGenerator:
 			category_id = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}ID")
 			category_id.text = category_code
 
-			tax_percent = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}Percent")
-			tax_percent.text = str(flt(rate, 2))
+			# BR-48: O (Not subject to VAT) has no rate; all others require Percent
+			if category_code != "O":
+				tax_percent = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}Percent")
+				tax_percent.text = str(flt(rate or 0, 2))
 
 			# Add exemption reason text if category requires it (E, AE, G, O, K)
 			if category_code in ["E", "AE", "G", "O", "K"]:
