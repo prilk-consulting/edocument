@@ -103,6 +103,16 @@ Then, you can map a **Common Code** from **Code List** "UNTDID.4461", e.g. "Cred
 
 Please note that the e-document standard only supports one payment means per invoice, so you should not specify multiple **Modes of Payment** in the same invoice.
 
+### VAT Exempt and Out of Scope Items
+
+Most invoices use standard VAT rates (S) or zero-rated VAT (Z, automatically detected for 0% rates). For special cases:
+
+- **VAT Exempt (E)**: Create a **Tax Category** (e.g., "VAT Exempt") and map it to code "E" in **Common Code**. Use this tax category on invoices with exempt items like books, education, or healthcare.
+
+- **Out of Scope (O)**: Create a **Tax Category** (e.g., "Out of Scope") and map it to code "O" in **Common Code**. Use for non-business transactions or items not subject to VAT. When any invoice line uses "O", VAT identifiers are automatically omitted from the entire invoice per PEPPOL rules.
+
+For item-specific tax treatment, map codes to **Item**, **Item Tax Template** or **Account** instead of **Tax Category**.
+
 ## How to Guide
 
 ### Master Data Configuration
