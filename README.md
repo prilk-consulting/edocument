@@ -113,6 +113,26 @@ Most invoices use standard VAT rates (S) or zero-rated VAT (Z, automatically det
 
 For item-specific tax treatment, map codes to **Item**, **Item Tax Template** or **Account** instead of **Tax Category**.
 
+### Intra-Community (IC) Invoices
+
+For sales to businesses in other EU countries with 0% VAT (intra-community supply):
+
+1. **Setup**: Create a **Tax Category** (e.g., "Intra-Community") and map it to code "K" in **Common Code**.
+
+2. **Automatic Handling**: When any invoice line uses category "K", the app automatically:
+   - Adds `TaxExemptionReasonCode` with value `VATEX-EU-IC`
+   - Adds `TaxExemptionReason` with text "Intra-community supply"
+   - Adds `Delivery` element with:
+     - `ActualDeliveryDate` (uses delivery date or posting date)
+     - Delivery country code (from shipping address or customer address)
+
+3. **PEPPOL Rules Satisfied**:
+   - **BR-IC-10**: Exemption reason code/text for IC supply
+   - **BR-IC-11**: Actual delivery date is required
+   - **BR-IC-12**: Delivery country code is required
+
+**Example**: A Dutch company sells goods to a German company. Set the Tax Category to "Intra-Community" (mapped to "K"). The e-document will include 0% VAT with IC exemption reason and delivery details proving goods were delivered to Germany.
+
 ## How to Guide
 
 ### Master Data Configuration

@@ -19,6 +19,8 @@ from edocument.edocument.profiles.peppol import (
 	PEPPOL_CUSTOMIZATION_ID,
 	PEPPOL_PROFILE_ID,
 	UBL_NAMESPACES,
+	VATEX_CODES,
+	VATEX_REASON_TEXTS,
 	duty_tax_fee_category_codes,
 	payment_means_codes,
 	uom_codes,
@@ -86,6 +88,19 @@ class PEPPOLGenerator:
 				return True
 		return False
 
+	def _is_intra_community_invoice(self) -> bool:
+		"""Check if the invoice is an intra-community supply.
+
+		An invoice is intra-community if any item has VAT category K.
+
+		Returns:
+		    bool: True if this is an intra-community invoice
+		"""
+		for item in self.invoice.items:
+			if self.get_vat_category_code(self.invoice, item=item) == "K":
+				return True
+		return False
+
 	def create_einvoice(self):
 		# Create the PEPPOL XML document
 		try:
@@ -97,6 +112,7 @@ class PEPPOLGenerator:
 			self._set_header()
 			self._set_seller()
 			self._set_buyer()
+			self._add_delivery()
 			self._add_payment_means()
 			self._add_allowances_charges()
 			self._add_tax_totals()
@@ -351,6 +367,48 @@ class PEPPOLGenerator:
 			contact_email = ET.SubElement(contact, f"{{{self.namespaces['cbc']}}}ElectronicMail")
 			contact_email.text = self.invoice.contact_email
 
+	def _add_delivery(self):
+		"""Add Delivery element for intra-community and cross-border invoices.
+
+		Required by:
+		- BR-IC-11: Intra-community supply must have ActualDeliveryDate or InvoicePeriod
+		- BR-IC-12: Intra-community supply must have Delivery country code
+
+		For IC invoices, adds:
+		- ActualDeliveryDate (BT-72): Uses posting_date or delivery_date from invoice
+		- DeliveryLocation/Address/Country (BT-80): Country where goods were delivered
+		"""
+		if not hasattr(self, "root") or self.root is None:
+			return
+
+		# Check if this is an intra-community invoice or has shipping address
+		is_ic = self._is_intra_community_invoice()
+
+		# Only add Delivery for IC invoices or when shipping address is present
+		if not is_ic and not self.shipping_address:
+			return
+
+		delivery = ET.SubElement(self.root, f"{{{self.namespaces['cac']}}}Delivery")
+
+		# ActualDeliveryDate (BT-72) - Required for IC invoices (BR-IC-11)
+		# Use delivery_date if available, otherwise posting_date
+		delivery_date = getattr(self.invoice, "delivery_date", None) or self.invoice.posting_date
+		if delivery_date:
+			actual_delivery_date = ET.SubElement(delivery, f"{{{self.namespaces['cbc']}}}ActualDeliveryDate")
+			actual_delivery_date.text = self.format_date(delivery_date)
+
+		# DeliveryLocation with Country (BT-80) - Required for IC invoices (BR-IC-12)
+		# Use shipping address if available, otherwise buyer address
+		delivery_address = self.shipping_address or self.buyer_address
+		if delivery_address and delivery_address.country:
+			delivery_location = ET.SubElement(delivery, f"{{{self.namespaces['cac']}}}DeliveryLocation")
+			address = ET.SubElement(delivery_location, f"{{{self.namespaces['cac']}}}Address")
+			country = ET.SubElement(address, f"{{{self.namespaces['cac']}}}Country")
+			country_code_elem = ET.SubElement(country, f"{{{self.namespaces['cbc']}}}IdentificationCode")
+			country_code_elem.text = (
+				frappe.db.get_value("Country", delivery_address.country, "code") or "DE"
+			).upper()
+
 	def _add_line_items(self):
 		# Add invoice line items
 		if not hasattr(self, "root") or self.root is None:
@@ -469,6 +527,15 @@ class PEPPOLGenerator:
 				tax_percent.text = str(flt(rate or 0, 2))
 
 			if category_code in ["E", "AE", "G", "O", "K"]:
+				# Add TaxExemptionReasonCode (VATEX code)
+				exemption_code = self._get_exemption_reason_code(category_code)
+				if exemption_code:
+					exemption_reason_code = ET.SubElement(
+						tax_category, f"{{{self.namespaces['cbc']}}}TaxExemptionReasonCode"
+					)
+					exemption_reason_code.text = exemption_code
+
+				# Add TaxExemptionReason (text description)
 				exemption_text = self._get_exemption_reason_text(category_code)
 				if exemption_text:
 					exemption_reason = ET.SubElement(
@@ -956,20 +1023,20 @@ class PEPPOLGenerator:
 		# Default to S (standard) for everything else
 		return duty_tax_fee_category_codes.default_code or "S"
 
+	def _get_exemption_reason_code(self, category_code: str) -> str:
+		"""Get VATEX exemption reason code for PEPPOL validation.
+
+		Returns the standardized VATEX code for non-standard VAT categories.
+		"""
+		return VATEX_CODES.get(category_code, "")
+
 	def _get_exemption_reason_text(self, category_code: str) -> str:
 		"""Get exemption reason text for PEPPOL validation.
 
 		Categories E, AE, G, O, K require either TaxExemptionReasonCode or TaxExemptionReason
 		per PEPPOL BIS business rules (BR-E-10, BR-AE-10, BR-G-10, BR-O-10, BR-IC-10).
 		"""
-		texts = {
-			"E": "Exempt from VAT",
-			"AE": "Reverse charge",
-			"G": "Export outside the EU",
-			"O": "Not subject to VAT",
-			"K": "Intra-community supply",
-		}
-		return texts.get(category_code, "")
+		return VATEX_REASON_TEXTS.get(category_code, "")
 
 	def get_xml_bytes(self) -> bytes:
 		# Return the XML as bytes

@@ -63,6 +63,27 @@ DOCUMENT_TYPE_ELEMENTS = {
 	},
 }
 
+# VATEX Exemption Reason Codes
+# Used for TaxExemptionReasonCode element in TaxCategory
+# Reference: https://ec.europa.eu/digital-building-blocks/wikis/display/DIGITAL/Code+lists
+VATEX_CODES = {
+	"K": "VATEX-EU-IC",  # Intra-community supply
+	"AE": "VATEX-EU-AE",  # Reverse charge
+	"O": "VATEX-EU-O",  # Not subject to VAT
+	"E": "VATEX-EU-132",  # Exempt from VAT (generic exemption)
+	"G": "VATEX-EU-G",  # Export outside the EU
+}
+
+# VATEX Exemption Reason Texts
+# Used for TaxExemptionReason element in TaxCategory
+VATEX_REASON_TEXTS = {
+	"K": "Intra-community supply",
+	"AE": "Reverse charge",
+	"O": "Not subject to VAT",
+	"E": "Exempt from VAT",
+	"G": "Export outside the EU",
+}
+
 # Global code retrievers for PEPPOL standardized codes (shared across generator and import)
 from edocument.edocument.common_codes import CommonCodeRetriever
 
