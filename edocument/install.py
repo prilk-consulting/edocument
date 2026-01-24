@@ -185,6 +185,7 @@ def create_peppol_profile():
 				"validator_path": "edocument.edocument.profiles.peppol.validator.validate_peppol_xml",
 				"preview_path": "edocument.edocument.profiles.peppol.preview.preview_peppol_xml",
 				"detector_path": "edocument.edocument.profiles.peppol.detector.detect_edocument_fields",
+				"matcher_path": "edocument.edocument.profiles.peppol.matcher.match_peppol_xml",
 				"validate_sales_invoice_on_save": 0,
 				"validate_sales_invoice_on_submit": 0,
 				"action_on_validation_error_during_save": 0,

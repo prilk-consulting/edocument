@@ -21,6 +21,9 @@
   "xml_file",
   "edocument_target_type",
   "edocument_target_document",
+  "matching_section",
+  "matching_summary",
+  "matching_data",
   "error_section",
   "error",
   "preview_section",
@@ -62,7 +65,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
-   "options": "\nValidation Successful\nValidation Failed\nTransmission Successful\nTransmission Failed"
+   "options": "\nValidation Successful\nValidation Failed\nMatching Successful\nMatching Failed\nTransmission Successful\nTransmission Failed"
   },
   {
    "fieldname": "country",
@@ -142,6 +145,25 @@
    "fieldname": "reference",
    "fieldtype": "Data",
    "label": "Reference"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "matching_section",
+   "fieldtype": "Section Break",
+   "label": "Matching"
+  },
+  {
+   "fieldname": "matching_summary",
+   "fieldtype": "Long Text",
+   "label": "Matching Summary",
+   "read_only": 1
+  },
+  {
+   "fieldname": "matching_data",
+   "fieldtype": "JSON",
+   "hidden": 1,
+   "label": "Matching Data",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,

@@ -12,7 +12,7 @@ import frappe
 from frappe import _
 
 
-def get_xml_parser(xml_bytes, edocument_profile):
+def get_xml_parser(xml_bytes, edocument_profile, edocument=None):
 	"""
 	Get XML parser based on the profile.
 
@@ -23,6 +23,7 @@ def get_xml_parser(xml_bytes, edocument_profile):
 	Args:
 		xml_bytes: The XML content as bytes
 		edocument_profile: The EDocument Profile document
+		edocument: Optional EDocument instance (for accessing matching_data)
 
 	Returns:
 		dict: Document data dictionary with 'doctype' field ready to be used with frappe.get_doc()
@@ -31,7 +32,7 @@ def get_xml_parser(xml_bytes, edocument_profile):
 	if hasattr(edocument_profile, "parser_path") and edocument_profile.parser_path:
 		try:
 			parser_func = frappe.get_attr(edocument_profile.parser_path)
-			return parser_func(xml_bytes, edocument_profile)
+			return parser_func(xml_bytes, edocument_profile, edocument=edocument)
 		except Exception as e:
 			frappe.log_error(f"Error loading parser from path {edocument_profile.parser_path}: {e!s}")
 			# Fall through to basic parser if loading fails
