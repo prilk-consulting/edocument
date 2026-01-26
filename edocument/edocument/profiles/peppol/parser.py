@@ -346,15 +346,15 @@ def parse_peppol_line_items(
 
 		# Price and rate calculation
 		price_text = get_xml_text(invoice_line, ".//cac:Price/cbc:PriceAmount", namespaces)
+		base_qty_text = get_xml_text(invoice_line, ".//cac:Price/cbc:BaseQuantity", namespaces)
 		line_total_text = get_xml_text(invoice_line, ".//cbc:LineExtensionAmount", namespaces)
 
-		if price_text and item.get("qty"):
-			# Calculate rate from price and quantity
+		if price_text:
+			# PriceAmount is the unit price, BaseQuantity is what that price applies to (default 1)
+			# rate = PriceAmount / BaseQuantity
 			net_rate = float(price_text)
-			basis_qty = float(item["qty"]) or 1.0
-			item["rate"] = net_rate / basis_qty
-		elif price_text:
-			item["rate"] = flt_or_none(price_text)
+			base_qty = float(base_qty_text) if base_qty_text else 1.0
+			item["rate"] = net_rate / base_qty if base_qty else net_rate
 
 		# Line total
 		if line_total_text:
