@@ -76,7 +76,9 @@ def match_basic_xml(xml_bytes, edocument_profile):
 				{
 					"fieldtype": "HTML",
 					"fieldname": "info",
-					"options": _("No matching configuration for this profile. All entities are considered matched."),
+					"options": _(
+						"No matching configuration for this profile. All entities are considered matched."
+					),
 				}
 			],
 			"primary_action_label": _("OK"),

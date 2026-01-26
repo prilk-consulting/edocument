@@ -10,15 +10,19 @@ frappe.ui.form.on("EDocument", {
 function setup_action_buttons(frm) {
 	// Generate XML - for outgoing documents
 	if (frm.doc.edocument_source_document && frm.doc.edocument_profile) {
-		frm.add_custom_button(__("Generate XML"), () => {
-			frm.call({
-				method: "generate_xml",
-				doc: frm.doc,
-				freeze: true,
-				freeze_message: __("Generating XML..."),
-				callback: () => frm.reload_doc(),
-			});
-		}, __("Actions"));
+		frm.add_custom_button(
+			__("Generate XML"),
+			() => {
+				frm.call({
+					method: "generate_xml",
+					doc: frm.doc,
+					freeze: true,
+					freeze_message: __("Generating XML..."),
+					callback: () => frm.reload_doc(),
+				});
+			},
+			__("Actions")
+		);
 	}
 
 	// XML-dependent buttons
@@ -33,8 +37,16 @@ function setup_action_buttons(frm) {
 			frm.add_custom_button(__("Preview EDocument"), () => show_preview(frm), __("Actions"));
 			frm.add_custom_button(__("Validate XML"), () => validate_xml(frm), __("Actions"));
 			frm.add_custom_button(__("Match Document"), () => match_document(frm), __("Actions"));
-			frm.add_custom_button(__("Create Document"), () => create_document(frm), __("Actions"));
-			frm.add_custom_button(__("Review and Create Document"), () => review_and_create(frm), __("Actions"));
+			frm.add_custom_button(
+				__("Create Document"),
+				() => create_document(frm),
+				__("Actions")
+			);
+			frm.add_custom_button(
+				__("Review and Create Document"),
+				() => review_and_create(frm),
+				__("Actions")
+			);
 
 			// Auto-load preview on form load
 			show_preview(frm);
@@ -79,7 +91,9 @@ function create_document(frm) {
 		doc: frm.doc,
 		freeze: true,
 		freeze_message: __("Creating document from XML..."),
-		callback: (r) => { if (r.message) frm.reload_doc(); },
+		callback: (r) => {
+			if (r.message) frm.reload_doc();
+		},
 	});
 }
 
@@ -146,7 +160,10 @@ function save_matching(frm, dialog, original_data) {
 	// Update purchase order
 	if (data.purchase_order) {
 		data.purchase_order.matched = values.purchase_order || null;
-		if (values.purchase_order && values.purchase_order !== original_data.purchase_order?.matched) {
+		if (
+			values.purchase_order &&
+			values.purchase_order !== original_data.purchase_order?.matched
+		) {
 			data.purchase_order.match_method = "manual";
 		}
 	}

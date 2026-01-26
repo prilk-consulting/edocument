@@ -254,8 +254,10 @@ def auto_match_entities(candidates: dict, existing_matching_data: dict | None = 
 			matched_po = po_data["xml_order_reference"]
 			match_method = "order_reference"
 
-		if not matched_po and po_data.get("xml_buyer_reference") and frappe.db.exists(
-			"Purchase Order", po_data["xml_buyer_reference"]
+		if (
+			not matched_po
+			and po_data.get("xml_buyer_reference")
+			and frappe.db.exists("Purchase Order", po_data["xml_buyer_reference"])
 		):
 			matched_po = po_data["xml_buyer_reference"]
 			match_method = "buyer_reference"
@@ -397,30 +399,36 @@ def _get_dialog_config(matching_data: dict) -> dict:
 	# --- Supplier Section ---
 	fields.append({"fieldtype": "Section Break", "label": _("Supplier")})
 
-	fields.append({
-		"fieldtype": "Data",
-		"fieldname": "xml_supplier_name",
-		"label": _("XML Supplier Name"),
-		"default": supplier_data.get("xml_name") or "-",
-		"read_only": 1,
-	})
+	fields.append(
+		{
+			"fieldtype": "Data",
+			"fieldname": "xml_supplier_name",
+			"label": _("XML Supplier Name"),
+			"default": supplier_data.get("xml_name") or "-",
+			"read_only": 1,
+		}
+	)
 	fields.append({"fieldtype": "Column Break"})
-	fields.append({
-		"fieldtype": "Data",
-		"fieldname": "xml_supplier_tax_id",
-		"label": _("XML Tax ID"),
-		"default": supplier_data.get("xml_tax_id") or "-",
-		"read_only": 1,
-	})
+	fields.append(
+		{
+			"fieldtype": "Data",
+			"fieldname": "xml_supplier_tax_id",
+			"label": _("XML Tax ID"),
+			"default": supplier_data.get("xml_tax_id") or "-",
+			"read_only": 1,
+		}
+	)
 	fields.append({"fieldtype": "Section Break"})
-	fields.append({
-		"fieldtype": "Link",
-		"fieldname": "supplier",
-		"label": _("Match to Supplier"),
-		"options": "Supplier",
-		"reqd": 1,
-		"default": supplier_data.get("matched"),
-	})
+	fields.append(
+		{
+			"fieldtype": "Link",
+			"fieldname": "supplier",
+			"label": _("Match to Supplier"),
+			"options": "Supplier",
+			"reqd": 1,
+			"default": supplier_data.get("matched"),
+		}
+	)
 
 	# --- Items Section as Table ---
 	if items_data:
@@ -436,43 +444,85 @@ def _get_dialog_config(matching_data: dict) -> dict:
 			uom = item.get("uom") or ""
 			matched = item.get("matched")
 
-			table_data.append({
-				"line_no": idx + 1,
-				"xml_product": xml_name,
-				"seller_id": xml_seller_id,
-				"qty": f"{qty} {uom}".strip(),
-				"matched_item": matched,
-			})
+			table_data.append(
+				{
+					"line_no": idx + 1,
+					"xml_product": xml_name,
+					"seller_id": xml_seller_id,
+					"qty": f"{qty} {uom}".strip(),
+					"matched_item": matched,
+				}
+			)
 
-		fields.append({
-			"fieldtype": "Table",
-			"fieldname": "items",
-			"label": _("Items"),
-			"cannot_add_rows": True,
-			"cannot_delete_rows": True,
-			"in_place_edit": True,
-			"data": table_data,
-			"fields": [
-				{"fieldtype": "Int", "fieldname": "line_no", "label": "#", "in_list_view": 1, "read_only": 1, "columns": 1},
-				{"fieldtype": "Data", "fieldname": "xml_product", "label": _("XML Product"), "in_list_view": 1, "read_only": 1, "columns": 3},
-				{"fieldtype": "Data", "fieldname": "seller_id", "label": _("Seller ID"), "in_list_view": 1, "read_only": 1, "columns": 2},
-				{"fieldtype": "Data", "fieldname": "qty", "label": _("Qty"), "in_list_view": 1, "read_only": 1, "columns": 1},
-				{"fieldtype": "Link", "fieldname": "matched_item", "label": _("Match to Item"), "options": "Item", "in_list_view": 1, "reqd": 1, "columns": 3},
-			],
-		})
+		fields.append(
+			{
+				"fieldtype": "Table",
+				"fieldname": "items",
+				"label": _("Items"),
+				"cannot_add_rows": True,
+				"cannot_delete_rows": True,
+				"in_place_edit": True,
+				"data": table_data,
+				"fields": [
+					{
+						"fieldtype": "Int",
+						"fieldname": "line_no",
+						"label": "#",
+						"in_list_view": 1,
+						"read_only": 1,
+						"columns": 1,
+					},
+					{
+						"fieldtype": "Data",
+						"fieldname": "xml_product",
+						"label": _("XML Product"),
+						"in_list_view": 1,
+						"read_only": 1,
+						"columns": 3,
+					},
+					{
+						"fieldtype": "Data",
+						"fieldname": "seller_id",
+						"label": _("Seller ID"),
+						"in_list_view": 1,
+						"read_only": 1,
+						"columns": 2,
+					},
+					{
+						"fieldtype": "Data",
+						"fieldname": "qty",
+						"label": _("Qty"),
+						"in_list_view": 1,
+						"read_only": 1,
+						"columns": 1,
+					},
+					{
+						"fieldtype": "Link",
+						"fieldname": "matched_item",
+						"label": _("Match to Item"),
+						"options": "Item",
+						"in_list_view": 1,
+						"reqd": 1,
+						"columns": 3,
+					},
+				],
+			}
+		)
 
 	# --- Purchase Order Section ---
 	po_ref = po_data.get("xml_order_reference") or po_data.get("xml_buyer_reference")
 	if po_ref:
 		fields.append({"fieldtype": "Section Break", "label": _("Purchase Order")})
 
-		fields.append({
-			"fieldtype": "Data",
-			"fieldname": "xml_po_reference",
-			"label": _("XML Order Reference"),
-			"default": po_data.get("xml_order_reference") or po_data.get("xml_buyer_reference") or "-",
-			"read_only": 1,
-		})
+		fields.append(
+			{
+				"fieldtype": "Data",
+				"fieldname": "xml_po_reference",
+				"label": _("XML Order Reference"),
+				"default": po_data.get("xml_order_reference") or po_data.get("xml_buyer_reference") or "-",
+				"read_only": 1,
+			}
+		)
 		fields.append({"fieldtype": "Section Break"})
 		fields.append(
 			{
@@ -488,18 +538,18 @@ def _get_dialog_config(matching_data: dict) -> dict:
 	# --- Summary Section ---
 	fields.append({"fieldtype": "Section Break", "label": _("Summary")})
 	summary = _generate_matching_summary(matching_data)
-	fields.append({
-		"fieldtype": "Long Text",
-		"fieldname": "matching_summary",
-		"label": _("Matching Status"),
-		"default": summary,
-		"read_only": 1,
-	})
+	fields.append(
+		{
+			"fieldtype": "Long Text",
+			"fieldname": "matching_summary",
+			"label": _("Matching Status"),
+			"default": summary,
+			"read_only": 1,
+		}
+	)
 
 	return {
 		"title": _("Match Invoice Data"),
 		"fields": fields,
 		"primary_action_label": _("Save"),
 	}
-
-
