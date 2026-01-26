@@ -10,7 +10,8 @@ This app provides a flexible framework for generating and parsing electronic doc
 - **UBL 2.1 XML Generation**: Generate compliant UBL 2.1 XML for invoices and credit notes
 - **Multiple Document Types**: Support for Invoice and CreditNote
 - **XML Validation**: XSD schema validation and Schematron business rule validation
-- **HTML Preview**: Visual preview of generated XML using XSLT transformations
+- **HTML Preview**: Visual preview of generated XML using XSLT transformations (auto-displayed on load)
+- **Entity Matching**: Match incoming XML entities (supplier, items, PO) to ERPNext master data with manual fallback
 - **Code List Management**: Automatic code list handling for PEPPOL standards
 - **Profile-Based Architecture**: Extensible profile system for different e-document standards
 - **Import/Export**: Import incoming PEPPOL invoices and export outgoing invoices
@@ -103,6 +104,36 @@ Then, you can map a **Common Code** from **Code List** "UNTDID.4461", e.g. "Cred
 
 Please note that the e-document standard only supports one payment means per invoice, so you should not specify multiple **Modes of Payment** in the same invoice.
 
+### VAT Exempt and Out of Scope Items
+
+Most invoices use standard VAT rates (S) or zero-rated VAT (Z, automatically detected for 0% rates). For special cases:
+
+- **VAT Exempt (E)**: Create a **Tax Category** (e.g., "VAT Exempt") and map it to code "E" in **Common Code**. Use this tax category on invoices with exempt items like books, education, or healthcare.
+
+- **Out of Scope (O)**: Create a **Tax Category** (e.g., "Out of Scope") and map it to code "O" in **Common Code**. Use for non-business transactions or items not subject to VAT. When any invoice line uses "O", VAT identifiers are automatically omitted from the entire invoice per PEPPOL rules.
+
+For item-specific tax treatment, map codes to **Item**, **Item Tax Template** or **Account** instead of **Tax Category**.
+
+### Intra-Community (IC) Invoices
+
+For sales to businesses in other EU countries with 0% VAT (intra-community supply):
+
+1. **Setup**: Create a **Tax Category** (e.g., "Intra-Community") and map it to code "K" in **Common Code**.
+
+2. **Automatic Handling**: When any invoice line uses category "K", the app automatically:
+   - Adds `TaxExemptionReasonCode` with value `VATEX-EU-IC`
+   - Adds `TaxExemptionReason` with text "Intra-community supply"
+   - Adds `Delivery` element with:
+     - `ActualDeliveryDate` (uses delivery date or posting date)
+     - Delivery country code (from shipping address or customer address)
+
+3. **PEPPOL Rules Satisfied**:
+   - **BR-IC-10**: Exemption reason code/text for IC supply
+   - **BR-IC-11**: Actual delivery date is required
+   - **BR-IC-12**: Delivery country code is required
+
+**Example**: A Dutch company sells goods to a German company. Set the Tax Category to "Intra-Community" (mapped to "K"). The e-document will include 0% VAT with IC exemption reason and delivery details proving goods were delivered to Germany.
+
 ## How to Guide
 
 ### Master Data Configuration
@@ -148,6 +179,7 @@ The **EDocument Profile** defines the configuration for a specific e-document st
 - **Validator Path**: Function that validates XML against schemas and business rules
 - **Preview Path**: Function that converts XML to HTML preview using XSLT
 - **Detector Path**: Function that auto-detects fields from incoming XML
+- **Matcher Path**: Function that matches XML entities (supplier, items, PO) to ERPNext master data
 
 **Sales Invoice Settings**:
 - **EDocument generation on Save**: Automatically create EDocument when Sales Invoice is saved (draft)
@@ -188,8 +220,12 @@ For **incoming** e-documents (imported XML files):
 1. Upload the XML file
 2. The app automatically detects the document type and profile
 3. The XML is validated against XSD and Schematron rules
-4. Click **Preview EDocument** to view the formatted HTML preview of the document
-5. Click **Create Document** to parse the XML and create a Purchase Invoice
+4. The preview is automatically displayed when opening the EDocument
+5. Click **Match Document** to match XML entities (supplier, items, PO) to ERPNext master data
+   - If entities are not auto-matched, a dialog allows manual selection
+   - Matched data is saved for use when creating the document
+6. Click **Create Document** to parse the XML and create a Purchase Invoice using matched entities
+7. Click **Review and Create Document** to review the parsed data before saving
 
 ### Validation Errors
 
@@ -229,15 +265,16 @@ Before using the app, you need to create an **EDocument Profile** that defines w
 1. Go to **EDocument Profile** doctype
 2. Create a new profile (e.g., "PEPPOL")
 3. Set the profile identifier values:
-   - **Identifier Namespace**: `urn:oasis:names:specification:ubl:schema:xsd:Invoice-2`
+   - **Identifier Namespace**: `urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2`
    - **Identifier Element Name**: `CustomizationID`
    - **Identifier Value**: `urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0`
-4. Set the generator, parser, validator, preview, and detector paths:
+4. Set the function paths:
    - **Generator Path**: `edocument.edocument.profiles.peppol.generator.generate_peppol_xml`
    - **Parser Path**: `edocument.edocument.profiles.peppol.parser.parse_peppol_xml`
    - **Validator Path**: `edocument.edocument.profiles.peppol.validator.validate_peppol_xml`
    - **Preview Path**: `edocument.edocument.profiles.peppol.preview.preview_peppol_xml`
    - **Detector Path**: `edocument.edocument.profiles.peppol.detector.detect_edocument_fields`
+   - **Matcher Path**: `edocument.edocument.profiles.peppol.matcher.match_peppol_xml`
 
 ### Sales Invoice
 
@@ -316,9 +353,10 @@ The app performs comprehensive validation of generated and imported XML:
 3. **Schematron Validation**: Validates business rules using PEPPOL Schematron files
 
 Validation results are displayed in the **EDocument** record:
-- **Status**: Valid/Invalid
+- **Status**: Validation Successful / Validation Failed / Matching Successful / Matching Failed
 - **Error**: Any validation errors
 - **Warnings**: Any validation warnings
+- **Matching Summary**: Summary of entity matching results
 
 ### External Validation
 
@@ -334,6 +372,8 @@ The app follows a modular, profile-based architecture:
 - **`parser.py`**: Parses UBL 2.1 XML and creates ERPNext documents
 - **`validator.py`**: XSD and Schematron validation
 - **`preview.py`**: XSLT-based HTML preview generation
+- **`detector.py`**: Auto-detects EDocument fields from incoming XML
+- **`matcher.py`**: Matches XML entities to ERPNext master data
 - **`profiles/`**: Profile-specific implementations (PEPPOL, etc.)
 
 ### Profile System
@@ -349,6 +389,7 @@ Each profile defines:
 - Validator function (validates XML)
 - Preview function (converts XML to HTML using XSLT)
 - Detector function (auto-detects fields from incoming XML)
+- Matcher function (matches XML entities to ERPNext master data)
 - Profile identifier (for automatic detection)
 
 ### Automatic Field Detection
@@ -358,6 +399,16 @@ For incoming e-documents, the app automatically detects and populates fields usi
 - **Company**: Detected from buyer's EndpointID matching Company's electronic address
 - **Country**: Detected from seller's postal address country code
 - **Target Document Type**: Detected from XML root element (Invoice → Purchase Invoice, CreditNote → Purchase Invoice)
+
+### Entity Matching
+
+For incoming e-documents, the app matches XML entities to ERPNext master data using the profile's matcher:
+
+- **Supplier**: Auto-matched by name, tax ID, or electronic address
+- **Items**: Auto-matched by buyer item ID or seller product ID via Item Supplier table
+- **Purchase Order**: Auto-matched by OrderReference or BuyerReference
+
+When auto-matching fails, users can manually select the correct entities via a matching dialog. The matched data is stored in the EDocument and used when creating the target document.
 
 ## Contributing
 

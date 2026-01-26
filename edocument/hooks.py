@@ -137,6 +137,7 @@ doc_events = {
 	"Sales Invoice": {
 		"on_update": "edocument.edocument.custom.sales_invoice.on_update",
 		"before_submit": "edocument.edocument.custom.sales_invoice.before_submit",
+		"on_submit": "edocument.edocument.custom.sales_invoice.on_submit",
 	},
 	"Purchase Invoice": {
 		"on_update": "edocument.edocument.custom.purchase_invoice.on_update",

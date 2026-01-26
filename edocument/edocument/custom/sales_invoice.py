@@ -123,8 +123,10 @@ def on_update(doc, method):
 
 
 def before_submit(doc, method):
-	"""Create and validate EDocument before Sales Invoice is submitted.
+	"""Validate EDocument before Sales Invoice is submitted.
 
+	This hook only performs validation if an EDocument already exists.
+	Otherwise EDocument creation happens in on_submit to use the final invoice name.
 	Blocks submission if EDocument validation fails (unless ignore_validation_error is set).
 	"""
 	# Only process if edocument_profile is set
@@ -140,5 +142,92 @@ def before_submit(doc, method):
 	if not profile_settings.get("edocument_generation_on_submit"):
 		return
 
-	ignore_validation_error = profile_settings.get("ignore_validation_error_for_edocument_generation")
-	_create_edocument(doc, ignore_validation_error=ignore_validation_error)
+	# Check if EDocument already exists (created during save)
+	existing_edocument = frappe.db.exists(
+		"EDocument",
+		{
+			"edocument_source_type": doc.doctype,
+			"edocument_source_document": doc.name,
+		},
+	)
+
+	# If EDocument exists and we should block on validation error, validate it now
+	if existing_edocument:
+		ignore_validation_error = profile_settings.get("ignore_validation_error_for_edocument_generation")
+		if not ignore_validation_error:
+			edocument = frappe.get_doc("EDocument", existing_edocument)
+			if edocument.status == "Validation Failed":
+				frappe.throw(
+					_("EDocument {0} validation failed: {1}").format(
+						frappe.bold(edocument.name), edocument.error or _("Unknown error")
+					)
+				)
+
+
+def on_submit(doc, method):
+	"""Create or regenerate EDocument after Sales Invoice is submitted.
+
+	This ensures the eDocument uses the final invoice name, not the draft name.
+	"""
+	# Only process if edocument_profile is set
+	if not doc.edocument_profile:
+		return
+
+	# Get profile settings
+	profile_settings = _get_profile_settings(doc.edocument_profile)
+	if not profile_settings:
+		return
+
+	# Check if generation on submit is enabled
+	if not profile_settings.get("edocument_generation_on_submit"):
+		return
+
+	# Check if EDocument already exists (created during save)
+	existing_edocument = frappe.db.exists(
+		"EDocument",
+		{
+			"edocument_source_type": doc.doctype,
+			"edocument_source_document": doc.name,
+		},
+	)
+
+	if existing_edocument:
+		# EDocument exists - regenerate XML with final invoice name
+		edocument = frappe.get_doc("EDocument", existing_edocument)
+
+		# Delete existing XML files
+		xml_files = frappe.get_all(
+			"File",
+			filters={
+				"attached_to_doctype": "EDocument",
+				"attached_to_name": edocument.name,
+				"file_name": ["like", "%.xml"],
+			},
+			pluck="name",
+		)
+		for file_name in xml_files:
+			frappe.delete_doc("File", file_name, ignore_permissions=True)
+
+		# Regenerate XML
+		edocument.generate_xml()
+
+		if edocument.status == "Validation Successful":
+			frappe.msgprint(
+				_("EDocument {0} regenerated with final invoice name and validated successfully").format(
+					frappe.bold(edocument.name)
+				),
+				indicator="green",
+				alert=True,
+			)
+		elif edocument.status == "Validation Failed":
+			frappe.msgprint(
+				_("EDocument {0} regenerated but validation failed: {1}").format(
+					frappe.bold(edocument.name), edocument.error or _("Unknown error")
+				),
+				indicator="orange",
+				alert=True,
+			)
+	else:
+		# EDocument doesn't exist - create it now with final invoice name
+		ignore_validation_error = profile_settings.get("ignore_validation_error_for_edocument_generation")
+		_create_edocument(doc, ignore_validation_error=ignore_validation_error)

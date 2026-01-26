@@ -400,6 +400,139 @@ class EDocument(Document):
 
 		return get_xml_preview(xml_bytes, self.edocument_profile)
 
+	@frappe.whitelist()
+	def get_matching_status(self) -> dict:
+		"""
+		Get matching status for this EDocument using profile-specific matcher.
+
+		Returns:
+			dict: Matching status with structure:
+				{
+					"has_matcher": True/False,
+					"is_matched": True/False,
+					"matching_data": {...},
+					"dialog_config": {...},
+					"matching_summary": "..."
+				}
+		"""
+		if not self.edocument_profile:
+			return {"has_matcher": False, "is_matched": False}
+
+		try:
+			edocument_profile = frappe.get_doc("EDocument Profile", self.edocument_profile)
+		except Exception:
+			return {"has_matcher": False, "is_matched": False}
+
+		# Get XML bytes
+		try:
+			xml_bytes = self._get_xml_from_attached_files()
+		except Exception:
+			return {"has_matcher": True, "is_matched": False, "error": "No XML file found"}
+
+		try:
+			# Import and call the matcher
+			from edocument.edocument.matcher import get_xml_matcher
+
+			result = get_xml_matcher(xml_bytes, edocument_profile, self)
+
+			# Add has_matcher flag (True if profile has matcher_path, False if using fallback)
+			result["has_matcher"] = bool(edocument_profile.matcher_path)
+
+			return result
+		except Exception as e:
+			frappe.log_error(
+				f"Error in get_matching_status for {self.name}: {e!s}",
+				"EDocument Matcher Error",
+			)
+			return {"has_matcher": True, "is_matched": False, "error": str(e)}
+
+	@frappe.whitelist()
+	def save_matching_data(self, matching_data: str | dict) -> dict:
+		"""
+		Save matching data for this EDocument.
+
+		This method:
+		1. Saves matching_data to the edocument
+		2. Re-runs matching to determine is_matched status
+		3. Updates status to "Matching Successful" or "Matching Failed"
+		4. Generates and saves matching_summary
+
+		Args:
+			matching_data: Matching data as JSON string or dict
+
+		Returns:
+			dict: Result with success status
+		"""
+		import json
+
+		if not self.edocument_profile:
+			frappe.throw(_("EDocument Profile is required for matching."))
+
+		edocument_profile = frappe.get_doc("EDocument Profile", self.edocument_profile)
+
+		if not edocument_profile.matcher_path:
+			frappe.throw(_("No matcher configured for profile {0}.").format(self.edocument_profile))
+
+		# Parse matching_data if it's a string
+		if isinstance(matching_data, str):
+			matching_data = json.loads(matching_data)
+
+		# Get XML bytes
+		xml_bytes = self._get_xml_from_attached_files()
+
+		# Save matching_data first so the matcher can use it
+		frappe.db.set_value(
+			"EDocument",
+			self.name,
+			"matching_data",
+			json.dumps(matching_data, default=str),
+			update_modified=False,
+		)
+
+		# Reload to get the updated matching_data
+		self.reload()
+
+		# Re-run matching to determine final status
+		try:
+			from edocument.edocument.matcher import get_xml_matcher
+
+			result = get_xml_matcher(xml_bytes, edocument_profile, self)
+
+			if result is None:
+				frappe.throw(_("Matcher returned no result."))
+
+			is_matched = result.get("is_matched", False)
+			matching_summary = result.get("matching_summary", "")
+
+			# Translate is_matched to status (like validator does with is_valid)
+			status = "Matching Successful" if is_matched else "Matching Failed"
+
+			# Update status and summary using db.set_value to avoid before_save hook
+			frappe.db.set_value(
+				"EDocument",
+				self.name,
+				{
+					"status": status,
+					"matching_summary": matching_summary,
+				},
+				update_modified=True,
+			)
+
+			frappe.db.commit()
+
+			return {
+				"success": True,
+				"edocument_name": self.name,
+				"is_matched": is_matched,
+				"status": status,
+			}
+		except Exception as e:
+			frappe.log_error(
+				f"Error in save_matching_data for {self.name}: {e!s}",
+				"EDocument Matcher Error",
+			)
+			frappe.throw(_("Error saving matching data: {0}").format(str(e)))
+
 	def _get_xml_from_attached_files(self) -> bytes:
 		"""
 		Get XML bytes from the most recently attached XML file.
@@ -508,8 +641,8 @@ def create_document(source_name, target_doc=None):
 	# Import and call the profile-specific parser
 	from edocument.edocument.parser import get_xml_parser
 
-	# Parse XML using profile-specific parser
-	document_data = get_xml_parser(xml_bytes, edocument_profile)
+	# Parse XML using profile-specific parser (pass edocument for matching_data access)
+	document_data = get_xml_parser(xml_bytes, edocument_profile, edocument=edocument)
 
 	# Validate that parser returned a dict with doctype
 	if not isinstance(document_data, dict):

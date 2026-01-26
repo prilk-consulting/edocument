@@ -73,7 +73,7 @@ def _detect_document_type_from_xml(root) -> str:
 	return "Invoice"
 
 
-def parse_peppol_xml(xml_bytes, edocument_profile):
+def parse_peppol_xml(xml_bytes, edocument_profile, edocument=None):
 	"""
 	Parse PEPPOL UBL 2.1 XML and return Purchase Invoice dict structure.
 	Supports Invoice, CreditNote, and DebitNote documents.
@@ -81,16 +81,27 @@ def parse_peppol_xml(xml_bytes, edocument_profile):
 	Args:
 		xml_bytes: The XML content as bytes
 		edocument_profile: The EDocument Profile document
+		edocument: Optional EDocument instance (for accessing matching_data)
 
 	Returns:
 		dict: Purchase Invoice data dictionary with 'doctype' field ready to be used with frappe.get_doc()
 	"""
+	import json
+
 	# Validate XML structure first
 	try:
 		xml_bytes = validate_xml_structure(xml_bytes)
 		root = ET.fromstring(xml_bytes)
 	except ValueError as e:
 		frappe.throw(_("The uploaded file does not contain valid XML data: {0}").format(str(e)))
+
+	# Get matching data if available
+	matching_data = None
+	if edocument and edocument.matching_data:
+		try:
+			matching_data = json.loads(edocument.matching_data)
+		except (json.JSONDecodeError, TypeError):
+			pass
 
 	# Detect document type (Invoice, CreditNote, DebitNote)
 	document_type = _detect_document_type_from_xml(root)
@@ -131,8 +142,12 @@ def parse_peppol_xml(xml_bytes, edocument_profile):
 		pi_data["due_date"] = due_date
 		pi_data["currency"] = currency
 
-		# Parse seller (supplier) information
-		seller_data = parse_peppol_seller(root, namespaces)
+		# Parse seller (supplier) information - use matching_data if available
+		matched_supplier = None
+		if matching_data and matching_data.get("supplier", {}).get("matched"):
+			matched_supplier = matching_data["supplier"]["matched"]
+
+		seller_data = parse_peppol_seller(root, namespaces, matched_supplier=matched_supplier)
 		pi_data["supplier"] = seller_data.get("supplier")
 		pi_data["supplier_name"] = seller_data.get("name")
 
@@ -140,19 +155,38 @@ def parse_peppol_xml(xml_bytes, edocument_profile):
 		buyer_data = parse_peppol_buyer(root, namespaces)
 		pi_data["company"] = buyer_data.get("company") or get_default_company()
 
-		# Check for Purchase Order from OrderReference or BuyerReference
-		# Both can contain the PO number
-		order_reference = get_xml_text(root, ".//cac:OrderReference/cbc:ID", namespaces)
-		buyer_reference = get_xml_text(root, ".//cbc:BuyerReference", namespaces)
+		# Check for Purchase Order - use matching_data if available
+		matched_po = None
+		if matching_data and matching_data.get("purchase_order", {}).get("matched"):
+			matched_po = matching_data["purchase_order"]["matched"]
 
-		# Use OrderReference first, fallback to BuyerReference
-		po_reference = order_reference or buyer_reference
-		if po_reference and frappe.db.exists("Purchase Order", po_reference):
-			pi_data["purchase_order"] = po_reference
+		if matched_po:
+			pi_data["purchase_order"] = matched_po
+		else:
+			# Fallback to auto-detect from OrderReference or BuyerReference
+			order_reference = get_xml_text(root, ".//cac:OrderReference/cbc:ID", namespaces)
+			buyer_reference = get_xml_text(root, ".//cbc:BuyerReference", namespaces)
+
+			# Use OrderReference first, fallback to BuyerReference
+			po_reference = order_reference or buyer_reference
+			if po_reference and frappe.db.exists("Purchase Order", po_reference):
+				pi_data["purchase_order"] = po_reference
+
+		# Build matched items lookup from matching_data
+		matched_items = {}
+		if matching_data and matching_data.get("items"):
+			for item in matching_data["items"]:
+				if item.get("matched"):
+					matched_items[item["line_index"]] = item["matched"]
 
 		# Parse line items (pass document_elements for generic parsing)
 		pi_data["items"] = parse_peppol_line_items(
-			root, namespaces, pi_data.get("purchase_order"), pi_data.get("supplier"), document_elements
+			root,
+			namespaces,
+			pi_data.get("purchase_order"),
+			pi_data.get("supplier"),
+			document_elements,
+			matched_items=matched_items,
 		)
 
 		# Parse taxes
@@ -184,11 +218,18 @@ def parse_peppol_xml(xml_bytes, edocument_profile):
 		raise
 
 
-def parse_peppol_seller(root, namespaces):
-	"""Parse seller (supplier) information from PEPPOL XML."""
+def parse_peppol_seller(root, namespaces, matched_supplier=None):
+	"""
+	Parse seller (supplier) information from PEPPOL XML.
+
+	Args:
+		root: XML root element
+		namespaces: Namespace dictionary
+		matched_supplier: Pre-matched supplier from matching_data (takes precedence)
+	"""
 	seller_party = root.find(".//cac:AccountingSupplierParty/cac:Party", namespaces)
 	if seller_party is None:
-		return {"supplier": None, "name": None}
+		return {"supplier": matched_supplier, "name": None}
 
 	# Seller name
 	seller_name = get_xml_text(
@@ -198,12 +239,13 @@ def parse_peppol_seller(root, namespaces):
 	# Seller tax ID
 	seller_tax_id = get_xml_text(seller_party, ".//cac:PartyTaxScheme/cbc:CompanyID", namespaces)
 
-	# Try to find or create supplier
-	supplier = None
-	if seller_name and frappe.db.exists("Supplier", seller_name):
-		supplier = seller_name
-	elif seller_tax_id:
-		supplier = frappe.db.get_value("Supplier", {"tax_id": seller_tax_id}, "name")
+	# Use matched supplier if provided, otherwise try to find
+	supplier = matched_supplier
+	if not supplier:
+		if seller_name and frappe.db.exists("Supplier", seller_name):
+			supplier = seller_name
+		elif seller_tax_id:
+			supplier = frappe.db.get_value("Supplier", {"tax_id": seller_tax_id}, "name")
 
 	return {"supplier": supplier, "name": seller_name, "tax_id": seller_tax_id}
 
@@ -227,7 +269,9 @@ def parse_peppol_buyer(root, namespaces):
 	return {"company": company, "name": buyer_name}
 
 
-def parse_peppol_line_items(root, namespaces, purchase_order=None, supplier=None, document_elements=None):
+def parse_peppol_line_items(
+	root, namespaces, purchase_order=None, supplier=None, document_elements=None, matched_items=None
+):
 	"""
 	Parse line items from PEPPOL XML.
 	Supports InvoiceLine, CreditNoteLine, and DebitNoteLine.
@@ -238,6 +282,7 @@ def parse_peppol_line_items(root, namespaces, purchase_order=None, supplier=None
 		purchase_order: Optional purchase order for item matching
 		supplier: Optional supplier for item matching
 		document_elements: Document type element names (from DOCUMENT_TYPE_ELEMENTS)
+		matched_items: Dict mapping line_index to matched item_code from matching_data
 
 	Returns:
 		list: List of item dictionaries
@@ -245,13 +290,14 @@ def parse_peppol_line_items(root, namespaces, purchase_order=None, supplier=None
 	if document_elements is None:
 		document_elements = DOCUMENT_TYPE_ELEMENTS["Invoice"]
 
+	matched_items = matched_items or {}
 	items = []
 
 	# Use document-specific line element name (InvoiceLine, CreditNoteLine, DebitNoteLine)
 	line_elem_name = document_elements["line"]
 	quantity_elem_name = document_elements["quantity"]
 
-	for invoice_line in root.findall(f".//cac:{line_elem_name}", namespaces):
+	for idx, invoice_line in enumerate(root.findall(f".//cac:{line_elem_name}", namespaces)):
 		item = {"doctype": "Purchase Invoice Item"}
 
 		# Product name/description
@@ -280,10 +326,12 @@ def parse_peppol_line_items(root, namespaces, purchase_order=None, supplier=None
 		if seller_product_id:
 			item["seller_product_id"] = seller_product_id
 
-		# Try to find item by buyer item ID
-		item_code = None
-		if buyer_item_id and frappe.db.exists("Item", buyer_item_id):
-			item_code = buyer_item_id
+		# Use matched item from matching_data if available
+		item_code = matched_items.get(idx)
+		if not item_code:
+			# Try to find item by buyer item ID
+			if buyer_item_id and frappe.db.exists("Item", buyer_item_id):
+				item_code = buyer_item_id
 
 		item["item_code"] = item_code
 
@@ -298,15 +346,15 @@ def parse_peppol_line_items(root, namespaces, purchase_order=None, supplier=None
 
 		# Price and rate calculation
 		price_text = get_xml_text(invoice_line, ".//cac:Price/cbc:PriceAmount", namespaces)
+		base_qty_text = get_xml_text(invoice_line, ".//cac:Price/cbc:BaseQuantity", namespaces)
 		line_total_text = get_xml_text(invoice_line, ".//cbc:LineExtensionAmount", namespaces)
 
-		if price_text and item.get("qty"):
-			# Calculate rate from price and quantity
+		if price_text:
+			# PriceAmount is the unit price, BaseQuantity is what that price applies to (default 1)
+			# rate = PriceAmount / BaseQuantity
 			net_rate = float(price_text)
-			basis_qty = float(item["qty"]) or 1.0
-			item["rate"] = net_rate / basis_qty
-		elif price_text:
-			item["rate"] = flt_or_none(price_text)
+			base_qty = float(base_qty_text) if base_qty_text else 1.0
+			item["rate"] = net_rate / base_qty if base_qty else net_rate
 
 		# Line total
 		if line_total_text:

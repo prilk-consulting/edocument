@@ -19,6 +19,8 @@ from edocument.edocument.profiles.peppol import (
 	PEPPOL_CUSTOMIZATION_ID,
 	PEPPOL_PROFILE_ID,
 	UBL_NAMESPACES,
+	VATEX_CODES,
+	VATEX_REASON_TEXTS,
 	duty_tax_fee_category_codes,
 	payment_means_codes,
 	uom_codes,
@@ -76,6 +78,29 @@ class PEPPOLGenerator:
 		document_type = DOCUMENT_TYPE_MAPPING.get(invoice_type_code, "Invoice")
 		return document_type
 
+	def _has_out_of_scope_items(self) -> bool:
+		"""Check if any invoice line has VAT category 'O' (Out of Scope).
+
+		Per PEPPOL BR-O-02: invoices with O items shall not contain VAT identifiers.
+		"""
+		for item in self.invoice.items:
+			if self.get_vat_category_code(self.invoice, item=item) == "O":
+				return True
+		return False
+
+	def _is_intra_community_invoice(self) -> bool:
+		"""Check if the invoice is an intra-community supply.
+
+		An invoice is intra-community if any item has VAT category K.
+
+		Returns:
+		    bool: True if this is an intra-community invoice
+		"""
+		for item in self.invoice.items:
+			if self.get_vat_category_code(self.invoice, item=item) == "K":
+				return True
+		return False
+
 	def create_einvoice(self):
 		# Create the PEPPOL XML document
 		try:
@@ -87,6 +112,7 @@ class PEPPOLGenerator:
 			self._set_header()
 			self._set_seller()
 			self._set_buyer()
+			self._add_delivery()
 			self._add_payment_means()
 			self._add_allowances_charges()
 			self._add_tax_totals()
@@ -226,7 +252,8 @@ class PEPPOLGenerator:
 			else:
 				country_code.text = "DE"
 
-		if self.invoice.company_tax_id:
+		# BR-O-02: Omit VAT identifiers if any item is Out of Scope
+		if self.invoice.company_tax_id and not self._has_out_of_scope_items():
 			tax_scheme = ET.SubElement(party, f"{{{self.namespaces['cac']}}}PartyTaxScheme")
 			company_id = ET.SubElement(tax_scheme, f"{{{self.namespaces['cbc']}}}CompanyID")
 			company_id.text = self.invoice.company_tax_id
@@ -310,7 +337,8 @@ class PEPPOLGenerator:
 			else:
 				country_code.text = "DE"
 
-		if self.invoice.tax_id:
+		# BR-O-02: Omit VAT identifiers if any item is Out of Scope
+		if self.invoice.tax_id and not self._has_out_of_scope_items():
 			tax_scheme = ET.SubElement(party, f"{{{self.namespaces['cac']}}}PartyTaxScheme")
 			company_id = ET.SubElement(tax_scheme, f"{{{self.namespaces['cbc']}}}CompanyID")
 			company_id.text = self.invoice.tax_id
@@ -338,6 +366,48 @@ class PEPPOLGenerator:
 			contact = ET.SubElement(party, f"{{{self.namespaces['cac']}}}Contact")
 			contact_email = ET.SubElement(contact, f"{{{self.namespaces['cbc']}}}ElectronicMail")
 			contact_email.text = self.invoice.contact_email
+
+	def _add_delivery(self):
+		"""Add Delivery element for intra-community and cross-border invoices.
+
+		Required by:
+		- BR-IC-11: Intra-community supply must have ActualDeliveryDate or InvoicePeriod
+		- BR-IC-12: Intra-community supply must have Delivery country code
+
+		For IC invoices, adds:
+		- ActualDeliveryDate (BT-72): Uses posting_date or delivery_date from invoice
+		- DeliveryLocation/Address/Country (BT-80): Country where goods were delivered
+		"""
+		if not hasattr(self, "root") or self.root is None:
+			return
+
+		# Check if this is an intra-community invoice or has shipping address
+		is_ic = self._is_intra_community_invoice()
+
+		# Only add Delivery for IC invoices or when shipping address is present
+		if not is_ic and not self.shipping_address:
+			return
+
+		delivery = ET.SubElement(self.root, f"{{{self.namespaces['cac']}}}Delivery")
+
+		# ActualDeliveryDate (BT-72) - Required for IC invoices (BR-IC-11)
+		# Use delivery_date if available, otherwise posting_date
+		delivery_date = getattr(self.invoice, "delivery_date", None) or self.invoice.posting_date
+		if delivery_date:
+			actual_delivery_date = ET.SubElement(delivery, f"{{{self.namespaces['cbc']}}}ActualDeliveryDate")
+			actual_delivery_date.text = self.format_date(delivery_date)
+
+		# DeliveryLocation with Country (BT-80) - Required for IC invoices (BR-IC-12)
+		# Use shipping address if available, otherwise buyer address
+		delivery_address = self.shipping_address or self.buyer_address
+		if delivery_address and delivery_address.country:
+			delivery_location = ET.SubElement(delivery, f"{{{self.namespaces['cac']}}}DeliveryLocation")
+			address = ET.SubElement(delivery_location, f"{{{self.namespaces['cac']}}}Address")
+			country = ET.SubElement(address, f"{{{self.namespaces['cac']}}}Country")
+			country_code_elem = ET.SubElement(country, f"{{{self.namespaces['cbc']}}}IdentificationCode")
+			country_code_elem.text = (
+				frappe.db.get_value("Country", delivery_address.country, "code") or "DE"
+			).upper()
 
 	def _add_line_items(self):
 		# Add invoice line items
@@ -380,12 +450,15 @@ class PEPPOLGenerator:
 
 		tax_category = ET.SubElement(item_elem, f"{{{self.namespaces['cac']}}}ClassifiedTaxCategory")
 
+		category_code = self.get_vat_category_code(self.invoice, item=item)
 		category_id = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}ID")
-		category_id.text = "S"
+		category_id.text = category_code
 
-		item_tax_rate = self._get_item_tax_rate(item)
-		tax_percent = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}Percent")
-		tax_percent.text = str(flt(item_tax_rate or 0, 2))
+		# BR-O-05: O lines shall not contain VAT rate; BR-E-05: E lines require rate = 0
+		if category_code != "O":
+			item_tax_rate = self._get_item_tax_rate(item) if category_code not in ("E",) else 0
+			tax_percent = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}Percent")
+			tax_percent.text = str(flt(item_tax_rate or 0, 2))
 
 		tax_scheme = ET.SubElement(tax_category, f"{{{self.namespaces['cac']}}}TaxScheme")
 		scheme_id = ET.SubElement(tax_scheme, f"{{{self.namespaces['cbc']}}}ID")
@@ -408,33 +481,37 @@ class PEPPOLGenerator:
 		tax_amount.text = str(flt(self.invoice.total_taxes_and_charges, 2))
 		tax_amount.set("currencyID", self.invoice.currency)
 
-		# Group taxes by rate from items
-		# Calculate taxes directly from items to ensure all tax rates are captured correctly
-		tax_rates = {}
+		# Group taxes by (category_code, rate)
+		# O items are not subject to VAT - no rate needed; E items require rate=0
+		tax_groups = {}
 		for item in self.invoice.items:
-			rate = self._get_item_tax_rate(item)
+			category_code = self.get_vat_category_code(self.invoice, item=item)
 
-			if not rate or rate == 0:
-				continue
+			# O is not subject to VAT - no rate; E is exempt with rate=0
+			if category_code == "O":
+				rate = None
+			elif category_code == "E":
+				rate = 0
+			else:
+				rate = self._get_item_tax_rate(item) or 0
 
-			if rate not in tax_rates:
-				tax_rates[rate] = {"taxable_amount": 0, "tax_amount": 0}
+			key = (category_code, rate)
 
-			# Calculate tax amount for this item
-			# item.net_amount is already after item-level discounts
-			item_tax_amount = flt(item.net_amount) * rate / 100
-			tax_rates[rate]["tax_amount"] += item_tax_amount
-			tax_rates[rate]["taxable_amount"] += flt(item.net_amount)
+			if key not in tax_groups:
+				tax_groups[key] = {"taxable_amount": 0, "tax_amount": 0}
 
-		# Add TaxSubtotal for each rate
-		for rate, data in tax_rates.items():
+			item_tax_amount = flt(item.net_amount) * (rate or 0) / 100
+			tax_groups[key]["tax_amount"] += item_tax_amount
+			tax_groups[key]["taxable_amount"] += flt(item.net_amount)
+
+		# Add TaxSubtotal for each (category, rate) group
+		for (category_code, rate), data in tax_groups.items():
 			tax_subtotal = ET.SubElement(tax_total, f"{{{self.namespaces['cac']}}}TaxSubtotal")
 
 			taxable_amount = ET.SubElement(tax_subtotal, f"{{{self.namespaces['cbc']}}}TaxableAmount")
 			taxable_amount.text = str(flt(data["taxable_amount"], 2))
 			taxable_amount.set("currencyID", self.invoice.currency)
 
-			# Use tax_amount_after_discount_amount directly (already correctly calculated by ERPNext)
 			tax_amount = ET.SubElement(tax_subtotal, f"{{{self.namespaces['cbc']}}}TaxAmount")
 			tax_amount.text = str(flt(data["tax_amount"], 2))
 			tax_amount.set("currencyID", self.invoice.currency)
@@ -442,10 +519,29 @@ class PEPPOLGenerator:
 			tax_category = ET.SubElement(tax_subtotal, f"{{{self.namespaces['cac']}}}TaxCategory")
 
 			category_id = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}ID")
-			category_id.text = "S"
+			category_id.text = category_code
 
-			tax_percent = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}Percent")
-			tax_percent.text = str(flt(rate, 2))
+			# BR-48: O (Not subject to VAT) has no rate; all others require Percent
+			if category_code != "O":
+				tax_percent = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}Percent")
+				tax_percent.text = str(flt(rate or 0, 2))
+
+			if category_code in ["E", "AE", "G", "O", "K"]:
+				# Add TaxExemptionReasonCode (VATEX code)
+				exemption_code = self._get_exemption_reason_code(category_code)
+				if exemption_code:
+					exemption_reason_code = ET.SubElement(
+						tax_category, f"{{{self.namespaces['cbc']}}}TaxExemptionReasonCode"
+					)
+					exemption_reason_code.text = exemption_code
+
+				# Add TaxExemptionReason (text description)
+				exemption_text = self._get_exemption_reason_text(category_code)
+				if exemption_text:
+					exemption_reason = ET.SubElement(
+						tax_category, f"{{{self.namespaces['cbc']}}}TaxExemptionReason"
+					)
+					exemption_reason.text = exemption_text
 
 			tax_scheme = ET.SubElement(tax_category, f"{{{self.namespaces['cac']}}}TaxScheme")
 			scheme_id = ET.SubElement(tax_scheme, f"{{{self.namespaces['cbc']}}}ID")
@@ -614,17 +710,24 @@ class PEPPOLGenerator:
 			# Tax Category: Use the tax rate from invoice taxes
 			# Get the first non-Actual tax rate (usually VAT)
 			tax_rate = None
+			sample_tax = None
 			for tax in self.invoice.taxes:
 				if tax.charge_type != "Actual" and tax.rate:
 					tax_rate = tax.rate
+					sample_tax = tax
 					break
 
 			if tax_rate and tax_rate > 0:
 				tax_category = ET.SubElement(allowance_charge, f"{{{self.namespaces['cac']}}}TaxCategory")
 
+				# Get category code dynamically
+				category_code = (
+					self.get_vat_category_code(self.invoice, tax=sample_tax) if sample_tax else "S"
+				)
+
 				# Category ID
 				category_id = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}ID")
-				category_id.text = "S"
+				category_id.text = category_code
 
 				tax_percent = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}Percent")
 				tax_percent.text = str(flt(tax_rate, 2))
@@ -659,9 +762,12 @@ class PEPPOLGenerator:
 				if tax.rate and tax.rate > 0:
 					tax_category = ET.SubElement(allowance_charge, f"{{{self.namespaces['cac']}}}TaxCategory")
 
+					# Get category code dynamically
+					category_code = self.get_vat_category_code(self.invoice, tax=tax)
+
 					# Category ID
 					category_id = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}ID")
-					category_id.text = "S"
+					category_id.text = category_code
 
 					tax_percent = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}Percent")
 					tax_percent.text = str(flt(tax.rate, 2))
@@ -874,6 +980,7 @@ class PEPPOLGenerator:
 		if item:
 			lookup_records.extend(
 				[
+					("Item", getattr(item, "item_code", None)),
 					("Item Tax Template", getattr(item, "item_tax_template", None)),
 					("Account", getattr(item, "income_account", None)),
 				]
@@ -896,10 +1003,40 @@ class PEPPOLGenerator:
 
 		lookup_records = [(doctype, name) for doctype, name in lookup_records if name]
 
-		# Get the VAT category code using CommonCodeRetriever
-		category_code = duty_tax_fee_category_codes.get(lookup_records)
+		# Check for explicit mapping only; fallback logic handles defaults below
+		category_code = duty_tax_fee_category_codes.get_code(lookup_records)
 
-		return category_code
+		if category_code:
+			return category_code
+
+		# Auto-detect Z (zero-rated) for 0% rates when no explicit mapping exists
+		tax_rate = None
+		if item:
+			tax_rate = self._get_item_tax_rate(item)
+		elif tax:
+			tax_rate = getattr(tax, "rate", None)
+
+		# 0% VAT line exists → Zero-rated (safe assumption, doesn't require exemption text)
+		if tax_rate is not None and flt(tax_rate) == 0:
+			return "Z"
+
+		# Default to S (standard) for everything else
+		return duty_tax_fee_category_codes.default_code or "S"
+
+	def _get_exemption_reason_code(self, category_code: str) -> str:
+		"""Get VATEX exemption reason code for PEPPOL validation.
+
+		Returns the standardized VATEX code for non-standard VAT categories.
+		"""
+		return VATEX_CODES.get(category_code, "")
+
+	def _get_exemption_reason_text(self, category_code: str) -> str:
+		"""Get exemption reason text for PEPPOL validation.
+
+		Categories E, AE, G, O, K require either TaxExemptionReasonCode or TaxExemptionReason
+		per PEPPOL BIS business rules (BR-E-10, BR-AE-10, BR-G-10, BR-O-10, BR-IC-10).
+		"""
+		return VATEX_REASON_TEXTS.get(category_code, "")
 
 	def get_xml_bytes(self) -> bytes:
 		# Return the XML as bytes
