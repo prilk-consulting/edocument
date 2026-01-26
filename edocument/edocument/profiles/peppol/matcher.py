@@ -305,13 +305,11 @@ def match_peppol_xml(xml_bytes, edocument_profile, edocument=None) -> dict:
 	items = matching_data.get("items", [])
 	all_items_matched = all(item.get("matched") for item in items) if items else True
 
-	# PO is required if XML contains a PO reference
-	po_data = matching_data.get("purchase_order", {})
-	po_ref_in_xml = po_data.get("xml_order_reference") or po_data.get("xml_buyer_reference")
-	po_matched = bool(po_data.get("matched")) if po_ref_in_xml else True
+	# PO matching is optional - not required for is_matched
+	# (PO reference in XML is informational, user can link manually if needed)
 
-	# Determine if fully matched
-	is_matched = supplier_matched and all_items_matched and po_matched
+	# Determine if fully matched (supplier and items only, PO is optional)
+	is_matched = supplier_matched and all_items_matched
 
 	# Generate dialog config and summary
 	dialog_config = _get_dialog_config(matching_data)
@@ -476,14 +474,16 @@ def _get_dialog_config(matching_data: dict) -> dict:
 			"read_only": 1,
 		})
 		fields.append({"fieldtype": "Section Break"})
-		fields.append({
-			"fieldtype": "Link",
-			"fieldname": "purchase_order",
-			"label": _("Match to Purchase Order"),
-			"options": "Purchase Order",
-			"reqd": 1,
-			"default": po_data.get("matched"),
-		})
+		fields.append(
+			{
+				"fieldtype": "Link",
+				"fieldname": "purchase_order",
+				"label": _("Match to Purchase Order"),
+				"options": "Purchase Order",
+				"reqd": 1,
+				"default": po_data.get("matched"),
+			}
+		)
 
 	# --- Summary Section ---
 	fields.append({"fieldtype": "Section Break", "label": _("Summary")})
