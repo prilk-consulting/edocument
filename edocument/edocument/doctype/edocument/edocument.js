@@ -135,6 +135,7 @@ function show_matching_dialog(frm, matching_data, config) {
 function save_matching(frm, dialog, original_data) {
 	const data = JSON.parse(JSON.stringify(original_data));
 	const values = dialog.get_values();
+	if (!values) return; // Validation failed
 
 	// Update supplier
 	if (data.supplier) {
