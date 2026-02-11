@@ -261,12 +261,18 @@ def parse_peppol_buyer(root, namespaces):
 		buyer_party, ".//cac:PartyLegalEntity/cbc:RegistrationName", namespaces
 	) or get_xml_text(buyer_party, ".//cac:PartyName/cbc:Name", namespaces)
 
-	# Try to find company
+	# Buyer tax ID
+	buyer_tax_id = get_xml_text(buyer_party, ".//cac:PartyTaxScheme/cbc:CompanyID", namespaces)
+
+	# Try to find company by tax ID first (more reliable than name)
 	company = None
-	if buyer_name and frappe.db.exists("Company", buyer_name):
+	if buyer_tax_id:
+		company = frappe.db.get_value("Company", {"tax_id": buyer_tax_id}, "name")
+
+	if not company and buyer_name and frappe.db.exists("Company", buyer_name):
 		company = buyer_name
 
-	return {"company": company, "name": buyer_name}
+	return {"company": company, "name": buyer_name, "tax_id": buyer_tax_id}
 
 
 def parse_peppol_line_items(
