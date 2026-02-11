@@ -120,6 +120,9 @@ class EDocument(Document):
 		Note: This method only generates XML - validation is handled separately.
 		This is the public method called from the button.
 		"""
+		if self.status == "Transmission Successful":
+			frappe.throw(_("Cannot regenerate XML for an already transmitted document."))
+
 		try:
 			file_name = self._generate_xml_internal()
 			# Save the document to persist status and error field changes
@@ -219,6 +222,9 @@ class EDocument(Document):
 		Updates the status and error fields based on validation results.
 		This is the public method called from the button.
 		"""
+		if self.status == "Transmission Successful":
+			frappe.throw(_("Cannot re-validate an already transmitted document."))
+
 		try:
 			self._validate_xml_internal()
 			# Save the document to persist status and error field changes
@@ -301,7 +307,13 @@ class EDocument(Document):
 						f"Error during automatic XML generation for EDocument {self.name}: {error_msg}"
 					)
 
-		if self.edocument_profile:
+		# Don't overwrite status for documents that reached a terminal state
+		# (already transmitted or matched) — re-validation would reset status
+		# back to "Validation Successful" and re-enable the Send button.
+		terminal_statuses = ("Transmission Successful", "Transmission Failed",
+			"Matching Successful", "Matching Failed")
+
+		if self.edocument_profile and self.status not in terminal_statuses:
 			# Validate XML automatically
 			try:
 				self._validate_xml_internal()
