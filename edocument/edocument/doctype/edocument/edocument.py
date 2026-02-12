@@ -310,8 +310,12 @@ class EDocument(Document):
 		# Don't overwrite status for documents that reached a terminal state
 		# (already transmitted or matched) — re-validation would reset status
 		# back to "Validation Successful" and re-enable the Send button.
-		terminal_statuses = ("Transmission Successful", "Transmission Failed",
-			"Matching Successful", "Matching Failed")
+		terminal_statuses = (
+			"Transmission Successful",
+			"Transmission Failed",
+			"Matching Successful",
+			"Matching Failed",
+		)
 
 		if self.edocument_profile and self.status not in terminal_statuses:
 			# Validate XML automatically
