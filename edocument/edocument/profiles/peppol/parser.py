@@ -409,7 +409,7 @@ def parse_peppol_taxes(root, namespaces):
 
 			# Tax account (try to find from tax category)
 			# This is a simplified approach - you may need to map tax categories to accounts
-			tax["account_head"] = None  # Will need to be set based on your tax setup
+			tax["account_head"] = None  # Resolved later by guess_missing_values
 
 		# Tax amount
 		tax_amount = get_xml_text(tax_subtotal, ".//cbc:TaxAmount", namespaces)
@@ -470,9 +470,9 @@ def parse_peppol_payment_terms(root, namespaces, default_due_date=None):
 
 		payment_schedule.append(schedule_item)
 
-	# If no payment terms found, add default one
-	if not payment_schedule and default_due_date:
-		payment_schedule.append({"doctype": "Payment Schedule", "due_date": default_due_date})
+	# Don't add a default payment_schedule entry with only due_date.
+	# ERPNext will compute the schedule from payment_terms_template (set via supplier defaults)
+	# or the user can add it manually. Adding an entry without payment_amount causes errors.
 
 	return payment_schedule
 
@@ -584,6 +584,17 @@ def guess_missing_values(pi_data):
 			except Exception:
 				pass
 
+		# Last resort: match by item name. Since item_name is not unique,
+		# this may match the wrong item when duplicates exist.
+		if not item.get("item_code") and item.get("item_name"):
+			item_name = item["item_name"]
+			if frappe.db.exists("Item", item_name):
+				item["item_code"] = item_name
+			else:
+				item_code = frappe.db.get_value("Item", {"item_name": item_name}, "name")
+				if item_code:
+					item["item_code"] = item_code
+
 		# Remove temporary fields (if they exist)
 		if "seller_product_id" in item:
 			item.pop("seller_product_id")
@@ -599,17 +610,27 @@ def guess_missing_values(pi_data):
 			if not item.get("purchase_order"):
 				item["purchase_order"] = pi_data["purchase_order"]
 
-	# Guess tax accounts for taxes (simplified - you may need to map based on your tax setup)
+	# Guess tax accounts for taxes from existing Purchase Taxes templates
+	company = pi_data.get("company")
 	for tax in pi_data.get("taxes", []):
-		if not tax.get("account_head") and tax.get("rate"):
-			# Try to find a default tax account based on rate
-			# This is a simplified approach - you may need to customize this
-			try:
-				# Get default tax account from company settings or tax template
-				# For now, leave it empty - user will need to set it manually
-				pass
-			except Exception:
-				pass
+		if not tax.get("account_head") and tax.get("rate") and company:
+			tax_rate = tax["rate"]
+			account_head = frappe.db.sql(
+				"""SELECT child.account_head
+				FROM `tabPurchase Taxes and Charges` child
+				JOIN `tabPurchase Taxes and Charges Template` parent ON child.parent = parent.name
+				WHERE child.rate = %s AND parent.company = %s AND parent.disabled = 0
+				ORDER BY parent.is_default DESC
+				LIMIT 1""",
+				(tax_rate, company),
+			)
+			if account_head:
+				tax["account_head"] = account_head[0][0]
+		if not tax.get("description"):
+			if tax.get("rate"):
+				tax["description"] = _("VAT {0}%").format(tax["rate"])
+			else:
+				tax["description"] = _("Tax")
 
 
 def guess_po_details(pi_data):
