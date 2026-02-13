@@ -8,8 +8,10 @@ frappe.ui.form.on("EDocument", {
 });
 
 function setup_action_buttons(frm) {
-	// Generate XML - for outgoing documents
-	if (frm.doc.edocument_source_document && frm.doc.edocument_profile) {
+	const is_transmitted = frm.doc.status === "Transmission Successful";
+
+	// Generate XML - for outgoing documents (not already transmitted)
+	if (frm.doc.edocument_source_document && frm.doc.edocument_profile && !is_transmitted) {
 		frm.add_custom_button(
 			__("Generate XML"),
 			() => {
@@ -35,7 +37,11 @@ function setup_action_buttons(frm) {
 			if (!r.message && !frm.doc.xml_file) return;
 
 			frm.add_custom_button(__("Preview EDocument"), () => show_preview(frm), __("Actions"));
-			frm.add_custom_button(__("Validate XML"), () => validate_xml(frm), __("Actions"));
+
+			if (!is_transmitted) {
+				frm.add_custom_button(__("Validate XML"), () => validate_xml(frm), __("Actions"));
+			}
+
 			frm.add_custom_button(__("Match Document"), () => match_document(frm), __("Actions"));
 			frm.add_custom_button(
 				__("Create Document"),
