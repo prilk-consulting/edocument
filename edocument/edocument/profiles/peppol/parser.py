@@ -187,6 +187,7 @@ def parse_peppol_xml(xml_bytes, edocument_profile, edocument=None):
 			pi_data.get("supplier"),
 			document_elements,
 			matched_items=matched_items,
+			is_return=pi_data.get("is_return"),
 		)
 
 		# Parse taxes
@@ -270,7 +271,13 @@ def parse_peppol_buyer(root, namespaces):
 
 
 def parse_peppol_line_items(
-	root, namespaces, purchase_order=None, supplier=None, document_elements=None, matched_items=None
+	root,
+	namespaces,
+	purchase_order=None,
+	supplier=None,
+	document_elements=None,
+	matched_items=None,
+	is_return=False,
 ):
 	"""
 	Parse line items from PEPPOL XML.
@@ -337,8 +344,14 @@ def parse_peppol_line_items(
 
 		# Quantity and UOM (use document-specific quantity element name)
 		qty_elem = invoice_line.find(f".//cbc:{quantity_elem_name}", namespaces)
+		negative_qty = False
 		if qty_elem is not None and qty_elem.text:
 			item["qty"] = flt_or_none(qty_elem.text)
+			# ERPNext does not allow negative quantities on non-return invoices
+			# Move the sign from quantity to rate to preserve the line total
+			if item["qty"] is not None and item["qty"] < 0 and not is_return:
+				negative_qty = True
+				item["qty"] = abs(item["qty"])
 			unit_code = qty_elem.get("unitCode")
 			if unit_code:
 				# Store unit_code for later UOM guessing
@@ -352,13 +365,16 @@ def parse_peppol_line_items(
 			# Calculate rate from price and quantity
 			net_rate = float(price_text)
 			basis_qty = float(item["qty"]) or 1.0
-			item["rate"] = net_rate / basis_qty
+			item["rate"] = -net_rate / basis_qty if negative_qty else net_rate / basis_qty
 		elif price_text:
-			item["rate"] = flt_or_none(price_text)
+			rate = flt_or_none(price_text)
+			item["rate"] = -rate if negative_qty and rate else rate
 
 		# Line total
 		if line_total_text:
 			item["amount"] = flt_or_none(line_total_text)
+			if negative_qty and item["amount"] is not None:
+				item["amount"] = -abs(item["amount"])
 
 		# Tax rate (for reference, actual tax is in taxes table)
 		tax_category = invoice_line.find(".//cac:Item/cac:ClassifiedTaxCategory", namespaces)
@@ -387,12 +403,12 @@ def parse_peppol_taxes(root, namespaces):
 		return taxes
 
 	for tax_subtotal in tax_total.findall(".//cac:TaxSubtotal", namespaces):
-		tax = {"doctype": "Purchase Taxes and Charges", "charge_type": "Actual"}
-
-		# Tax basis
-		taxable_amount = get_xml_text(tax_subtotal, ".//cbc:TaxableAmount", namespaces)
-		if taxable_amount:
-			tax["taxable_amount"] = flt_or_none(taxable_amount)
+		tax = {
+			"doctype": "Purchase Taxes and Charges",
+			"charge_type": "On Net Total",
+			"category": "Total",
+			"add_deduct_tax": "Add",
+		}
 
 		# Tax rate
 		tax_category = tax_subtotal.find(".//cac:TaxCategory", namespaces)
@@ -400,15 +416,6 @@ def parse_peppol_taxes(root, namespaces):
 			tax_percent = get_xml_text(tax_category, ".//cbc:Percent", namespaces)
 			if tax_percent:
 				tax["rate"] = flt_or_none(tax_percent)
-
-			# Tax account (try to find from tax category)
-			# This is a simplified approach - you may need to map tax categories to accounts
-			tax["account_head"] = None  # Will need to be set based on your tax setup
-
-		# Tax amount
-		tax_amount = get_xml_text(tax_subtotal, ".//cbc:TaxAmount", namespaces)
-		if tax_amount:
-			tax["tax_amount"] = flt_or_none(tax_amount)
 
 		taxes.append(tax)
 
@@ -593,17 +600,42 @@ def guess_missing_values(pi_data):
 			if not item.get("purchase_order"):
 				item["purchase_order"] = pi_data["purchase_order"]
 
-	# Guess tax accounts for taxes (simplified - you may need to map based on your tax setup)
+	# Guess tax accounts from company tax templates
+	guess_tax_accounts(pi_data)
+
+
+def guess_tax_accounts(pi_data):
+	"""Find account_head for tax rows by matching rate against company tax templates."""
+	company = pi_data.get("company")
+	if not company:
+		return
+
+	# Get all enabled tax templates for this company
+	templates = frappe.get_all(
+		"Purchase Taxes and Charges Template",
+		filters={"company": company, "disabled": 0},
+		pluck="name",
+	)
+	if not templates:
+		return
+
 	for tax in pi_data.get("taxes", []):
-		if not tax.get("account_head") and tax.get("rate"):
-			# Try to find a default tax account based on rate
-			# This is a simplified approach - you may need to customize this
-			try:
-				# Get default tax account from company settings or tax template
-				# For now, leave it empty - user will need to set it manually
-				pass
-			except Exception:
-				pass
+		if tax.get("account_head") or not tax.get("rate"):
+			continue
+
+		account_head = frappe.db.get_value(
+			"Purchase Taxes and Charges",
+			{
+				"charge_type": "On Net Total",
+				"rate": tax["rate"],
+				"parenttype": "Purchase Taxes and Charges Template",
+				"parent": ["in", templates],
+			},
+			"account_head",
+		)
+
+		if account_head:
+			tax["account_head"] = account_head
 
 
 def guess_po_details(pi_data):
