@@ -458,7 +458,12 @@ class PEPPOLGenerator:
 		item_elem = ET.SubElement(invoice_line, f"{{{self.namespaces['cac']}}}Item")
 
 		description = ET.SubElement(item_elem, f"{{{self.namespaces['cbc']}}}Description")
-		description.text = item.description or item.item_name
+		item_description = item.description or item.item_name
+		if frappe.utils.is_html(item_description):
+			from frappe.core.utils import html2text
+
+			item_description = html2text(item_description).strip()
+		description.text = item_description
 
 		name = ET.SubElement(item_elem, f"{{{self.namespaces['cbc']}}}Name")
 		name.text = item.item_name
