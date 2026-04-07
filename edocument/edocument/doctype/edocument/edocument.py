@@ -277,16 +277,16 @@ class EDocument(Document):
 				)
 
 		# Auto-detect EDocument fields (company, etc.) from XML using profile-specific detector
-		if self.edocument_profile and has_xml and not self.company:
+		if self.edocument_profile and has_xml:
 			try:
 				xml_bytes = self._get_xml_from_attached_files()
 				if xml_bytes:
 					from edocument.edocument.detector import get_edocument_fields
 
 					detected_fields = get_edocument_fields(xml_bytes, self.edocument_profile)
-					# Set detected fields on the document
+					# Set detected fields — override defaults from Frappe
 					for field, value in detected_fields.items():
-						if hasattr(self, field) and not getattr(self, field):
+						if hasattr(self, field) and value:
 							setattr(self, field, value)
 			except Exception as e:
 				frappe.log_error(
@@ -363,16 +363,16 @@ class EDocument(Document):
 				)
 
 		# Auto-detect EDocument fields (company, etc.) from XML using profile-specific detector
-		if self.edocument_profile and has_xml and not self.company:
+		if self.edocument_profile and has_xml:
 			try:
 				xml_bytes = self._get_xml_from_attached_files()
 				if xml_bytes:
 					from edocument.edocument.detector import get_edocument_fields
 
 					detected_fields = get_edocument_fields(xml_bytes, self.edocument_profile)
-					# Update detected fields directly in database
+					# Update detected fields — override defaults from Frappe
 					for field, value in detected_fields.items():
-						if hasattr(self, field) and not getattr(self, field):
+						if hasattr(self, field) and value:
 							self.db_set(field, value, update_modified=False)
 			except Exception as e:
 				frappe.log_error(

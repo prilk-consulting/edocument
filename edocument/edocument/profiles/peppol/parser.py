@@ -187,10 +187,11 @@ def parse_peppol_xml(xml_bytes, edocument_profile, edocument=None):
 			pi_data.get("supplier"),
 			document_elements,
 			matched_items=matched_items,
+			is_return=pi_data.get("is_return"),
 		)
 
-		# Parse taxes
-		pi_data["taxes"] = parse_peppol_taxes(root, namespaces)
+		# Remove taxes - will be populated from templates by guess_tax_templates
+		pi_data.pop("taxes", None)
 
 		# Post-process: guess missing values
 		guess_missing_values(pi_data)
@@ -276,7 +277,13 @@ def parse_peppol_buyer(root, namespaces):
 
 
 def parse_peppol_line_items(
-	root, namespaces, purchase_order=None, supplier=None, document_elements=None, matched_items=None
+	root,
+	namespaces,
+	purchase_order=None,
+	supplier=None,
+	document_elements=None,
+	matched_items=None,
+	is_return=False,
 ):
 	"""
 	Parse line items from PEPPOL XML.
@@ -343,8 +350,14 @@ def parse_peppol_line_items(
 
 		# Quantity and UOM (use document-specific quantity element name)
 		qty_elem = invoice_line.find(f".//cbc:{quantity_elem_name}", namespaces)
+		negative_qty = False
 		if qty_elem is not None and qty_elem.text:
 			item["qty"] = flt_or_none(qty_elem.text)
+			# ERPNext does not allow negative quantities on non-return invoices
+			# Move the sign from quantity to rate to preserve the line total
+			if item["qty"] is not None and item["qty"] < 0 and not is_return:
+				negative_qty = True
+				item["qty"] = abs(item["qty"])
 			unit_code = qty_elem.get("unitCode")
 			if unit_code:
 				# Store unit_code for later UOM guessing
@@ -360,11 +373,14 @@ def parse_peppol_line_items(
 			# rate = PriceAmount / BaseQuantity
 			net_rate = float(price_text)
 			base_qty = float(base_qty_text) if base_qty_text else 1.0
-			item["rate"] = net_rate / base_qty if base_qty else net_rate
+			rate = net_rate / base_qty if base_qty else net_rate
+			item["rate"] = -rate if negative_qty else rate
 
 		# Line total
 		if line_total_text:
 			item["amount"] = flt_or_none(line_total_text)
+			if negative_qty and item["amount"] is not None:
+				item["amount"] = -abs(item["amount"])
 
 		# Tax rate (for reference, actual tax is in taxes table)
 		tax_category = invoice_line.find(".//cac:Item/cac:ClassifiedTaxCategory", namespaces)
@@ -610,27 +626,76 @@ def guess_missing_values(pi_data):
 			if not item.get("purchase_order"):
 				item["purchase_order"] = pi_data["purchase_order"]
 
-	# Guess tax accounts for taxes from existing Purchase Taxes templates
+	# Set tax templates based on item tax rates
+	guess_tax_templates(pi_data)
+
+
+def guess_tax_templates(pi_data):
+	"""Set header or item tax templates based on item tax rates.
+
+	If all items share the same tax rate, set a header Purchase Taxes and Charges Template.
+	If items have different tax rates, set Item Tax Template on each item.
+	"""
 	company = pi_data.get("company")
-	for tax in pi_data.get("taxes", []):
-		if not tax.get("account_head") and tax.get("rate") and company:
-			tax_rate = tax["rate"]
-			account_head = frappe.db.sql(
-				"""SELECT child.account_head
-				FROM `tabPurchase Taxes and Charges` child
-				JOIN `tabPurchase Taxes and Charges Template` parent ON child.parent = parent.name
-				WHERE child.rate = %s AND parent.company = %s AND parent.disabled = 0
-				ORDER BY parent.is_default DESC
-				LIMIT 1""",
-				(tax_rate, company),
+	if not company:
+		return
+
+	items = pi_data.get("items", [])
+	if not items:
+		return
+
+	# Collect unique tax rates from items
+	tax_rates = {item["tax_rate"] for item in items if item.get("tax_rate") is not None}
+	if not tax_rates:
+		return
+
+	if len(tax_rates) == 1:
+		# All items have the same rate — use header template
+		rate = tax_rates.pop()
+		template = frappe.db.get_value(
+			"Purchase Taxes and Charges",
+			{
+				"rate": rate,
+				"charge_type": "On Net Total",
+				"parenttype": "Purchase Taxes and Charges Template",
+				"parent": [
+					"in",
+					frappe.get_all(
+						"Purchase Taxes and Charges Template",
+						filters={"company": company, "disabled": 0},
+						pluck="name",
+					),
+				],
+			},
+			"parent",
+		)
+		if template:
+			pi_data["taxes_and_charges"] = template
+	else:
+		# Mixed rates — set Item Tax Template per item
+		for item in items:
+			rate = item.get("tax_rate")
+			if rate is None:
+				continue
+
+			item_tax_template = frappe.db.get_value(
+				"Item Tax Template Detail",
+				{
+					"tax_rate": rate,
+					"parenttype": "Item Tax Template",
+					"parent": [
+						"in",
+						frappe.get_all(
+							"Item Tax Template",
+							filters={"company": company, "disabled": 0},
+							pluck="name",
+						),
+					],
+				},
+				"parent",
 			)
-			if account_head:
-				tax["account_head"] = account_head[0][0]
-		if not tax.get("description"):
-			if tax.get("rate"):
-				tax["description"] = _("VAT {0}%").format(tax["rate"])
-			else:
-				tax["description"] = _("Tax")
+			if item_tax_template:
+				item["item_tax_template"] = item_tax_template
 
 
 def guess_po_details(pi_data):
