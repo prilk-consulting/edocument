@@ -68,15 +68,16 @@ function show_preview(frm) {
 		freeze_message: __("Generating preview..."),
 		callback: (r) => {
 			if (!r.message) return;
-			frm.get_field("edocument_preview")?.set_value(r.message);
-			frm.get_field("edocument_preview")?.$wrapper?.css({
-				width: "100%",
-				padding: "15px",
-				background: "#fff",
-				border: "1px solid #e0e0e0",
-				borderRadius: "4px",
-				marginTop: "10px",
-			});
+			const field = frm.get_field("edocument_preview");
+			if (!field) return;
+
+			// Render preview in an iframe to isolate its CSS from ERPNext
+			const iframe = `<iframe srcdoc="${r.message.replace(/"/g, "&quot;")}"
+				style="width:100%;height:600px;border:1px solid #e0e0e0;border-radius:4px;background:#fff;"
+				frameborder="0">
+			</iframe>`;
+			field.set_value(iframe);
+			field.$wrapper?.css({ width: "100%", marginTop: "10px" });
 		},
 	});
 }
