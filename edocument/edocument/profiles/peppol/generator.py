@@ -429,21 +429,41 @@ class PEPPOLGenerator:
 		line_id = ET.SubElement(line_elem, f"{{{self.namespaces['cbc']}}}ID")
 		line_id.text = str(item.idx)
 
+		# Normalize signs for PEPPOL compliance
+		qty = flt(item.qty, item.precision("qty"))
+		item_amount = flt(item.amount, item.precision("amount"))
+		item_rate = flt(item.rate, item.precision("rate"))
+
+		if self.document_type == "CreditNote":
+			# Credit notes: all values positive (document type implies reversal)
+			qty = abs(qty)
+			item_amount = abs(item_amount)
+			item_rate = abs(item_rate)
+		elif item_amount < 0:
+			# Invoice deduction line: move negative from rate/price to quantity
+			qty = -abs(qty)
+			item_rate = abs(item_rate)
+
 		quantity = ET.SubElement(line_elem, f"{{{self.namespaces['cbc']}}}{quantity_elem_name}")
-		quantity.text = str(flt(item.qty, item.precision("qty")))
+		quantity.text = str(qty)
 		quantity.set("unitCode", self.map_unit_code(item.uom))
 
 		# Update references from invoice_line to line_elem
 		invoice_line = line_elem
 
 		line_amount = ET.SubElement(invoice_line, f"{{{self.namespaces['cbc']}}}LineExtensionAmount")
-		line_amount.text = str(flt(item.amount, item.precision("amount")))
+		line_amount.text = f"{item_amount:.2f}"
 		line_amount.set("currencyID", self.invoice.currency)
 
 		item_elem = ET.SubElement(invoice_line, f"{{{self.namespaces['cac']}}}Item")
 
 		description = ET.SubElement(item_elem, f"{{{self.namespaces['cbc']}}}Description")
-		description.text = item.description or item.item_name
+		item_description = item.description or item.item_name
+		if frappe.utils.is_html(item_description):
+			from frappe.core.utils import html2text
+
+			item_description = html2text(item_description).strip()
+		description.text = item_description
 
 		name = ET.SubElement(item_elem, f"{{{self.namespaces['cbc']}}}Name")
 		name.text = item.item_name
@@ -466,7 +486,8 @@ class PEPPOLGenerator:
 
 		price = ET.SubElement(invoice_line, f"{{{self.namespaces['cac']}}}Price")
 		price_amount = ET.SubElement(price, f"{{{self.namespaces['cbc']}}}PriceAmount")
-		price_amount.text = str(flt(item.rate, item.precision("rate")))
+		price_precision = item.precision("rate") or 2
+		price_amount.text = f"{item_rate:.{price_precision}f}"
 		price_amount.set("currencyID", self.invoice.currency)
 
 	def _add_tax_totals(self):
@@ -477,8 +498,12 @@ class PEPPOLGenerator:
 		tax_total = ET.SubElement(self.root, f"{{{self.namespaces['cac']}}}TaxTotal")
 
 		# Use invoice.total_taxes_and_charges for total TaxAmount (already correctly calculated after discount)
+		# Credit notes: use abs() since PEPPOL CreditNote expects positive values
+		total_tax = flt(self.invoice.total_taxes_and_charges, 2)
+		if self.document_type == "CreditNote":
+			total_tax = abs(total_tax)
 		tax_amount = ET.SubElement(tax_total, f"{{{self.namespaces['cbc']}}}TaxAmount")
-		tax_amount.text = str(flt(self.invoice.total_taxes_and_charges, 2))
+		tax_amount.text = f"{total_tax:.2f}"
 		tax_amount.set("currencyID", self.invoice.currency)
 
 		# Group taxes by (category_code, rate)
@@ -500,20 +525,23 @@ class PEPPOLGenerator:
 			if key not in tax_groups:
 				tax_groups[key] = {"taxable_amount": 0, "tax_amount": 0}
 
-			item_tax_amount = flt(item.net_amount) * (rate or 0) / 100
+			net_amount = flt(item.net_amount)
+			if self.document_type == "CreditNote":
+				net_amount = abs(net_amount)
+			item_tax_amount = net_amount * (rate or 0) / 100
 			tax_groups[key]["tax_amount"] += item_tax_amount
-			tax_groups[key]["taxable_amount"] += flt(item.net_amount)
+			tax_groups[key]["taxable_amount"] += net_amount
 
 		# Add TaxSubtotal for each (category, rate) group
 		for (category_code, rate), data in tax_groups.items():
 			tax_subtotal = ET.SubElement(tax_total, f"{{{self.namespaces['cac']}}}TaxSubtotal")
 
 			taxable_amount = ET.SubElement(tax_subtotal, f"{{{self.namespaces['cbc']}}}TaxableAmount")
-			taxable_amount.text = str(flt(data["taxable_amount"], 2))
+			taxable_amount.text = f"{flt(data['taxable_amount'], 2):.2f}"
 			taxable_amount.set("currencyID", self.invoice.currency)
 
 			tax_amount = ET.SubElement(tax_subtotal, f"{{{self.namespaces['cbc']}}}TaxAmount")
-			tax_amount.text = str(flt(data["tax_amount"], 2))
+			tax_amount.text = f"{flt(data['tax_amount'], 2):.2f}"
 			tax_amount.set("currencyID", self.invoice.currency)
 
 			tax_category = ET.SubElement(tax_subtotal, f"{{{self.namespaces['cac']}}}TaxCategory")
@@ -674,6 +702,8 @@ class PEPPOLGenerator:
 
 		# Handle document-level discounts (AllowanceCharge with ChargeIndicator=false)
 		discount_amount = flt(self.invoice.total, 2) - flt(self.invoice.net_total, 2)
+		if self.document_type == "CreditNote":
+			discount_amount = abs(discount_amount)
 		if discount_amount > 0:
 			# There's a document-level discount
 			allowance_charge = ET.SubElement(self.root, f"{{{self.namespaces['cac']}}}AllowanceCharge")
@@ -690,8 +720,13 @@ class PEPPOLGenerator:
 			reason.text = reason_text
 
 			# MultiplierFactorNumeric: Calculate percentage (Amount / BaseAmount * 100)
-			if self.invoice.total > 0:
-				multiplier = (discount_amount / flt(self.invoice.total, 2)) * 100
+			inv_total = (
+				abs(flt(self.invoice.total, 2))
+				if self.document_type == "CreditNote"
+				else flt(self.invoice.total, 2)
+			)
+			if inv_total > 0:
+				multiplier = (discount_amount / inv_total) * 100
 				multiplier_factor = ET.SubElement(
 					allowance_charge, f"{{{self.namespaces['cbc']}}}MultiplierFactorNumeric"
 				)
@@ -699,17 +734,17 @@ class PEPPOLGenerator:
 
 			# Amount: The discount amount
 			amount = ET.SubElement(allowance_charge, f"{{{self.namespaces['cbc']}}}Amount")
-			amount.text = str(flt(discount_amount, 2))
+			amount.text = f"{flt(discount_amount, 2):.2f}"
 			amount.set("currencyID", self.invoice.currency)
 
 			# BaseAmount: The amount before discount (invoice.total)
 			base_amount = ET.SubElement(allowance_charge, f"{{{self.namespaces['cbc']}}}BaseAmount")
-			base_amount.text = str(flt(self.invoice.total, 2))
+			base_amount.text = f"{inv_total:.2f}"
 			base_amount.set("currencyID", self.invoice.currency)
 
-			# Tax Category: Use the tax rate from invoice taxes
+			# Tax Category (BR-32: always required on AllowanceCharge)
 			# Get the first non-Actual tax rate (usually VAT)
-			tax_rate = None
+			tax_rate = 0
 			sample_tax = None
 			for tax in self.invoice.taxes:
 				if tax.charge_type != "Actual" and tax.rate:
@@ -717,25 +752,19 @@ class PEPPOLGenerator:
 					sample_tax = tax
 					break
 
-			if tax_rate and tax_rate > 0:
-				tax_category = ET.SubElement(allowance_charge, f"{{{self.namespaces['cac']}}}TaxCategory")
+			tax_category = ET.SubElement(allowance_charge, f"{{{self.namespaces['cac']}}}TaxCategory")
 
-				# Get category code dynamically
-				category_code = (
-					self.get_vat_category_code(self.invoice, tax=sample_tax) if sample_tax else "S"
-				)
+			category_code = self.get_vat_category_code(self.invoice, tax=sample_tax)
 
-				# Category ID
-				category_id = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}ID")
-				category_id.text = category_code
+			category_id = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}ID")
+			category_id.text = category_code
 
-				tax_percent = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}Percent")
-				tax_percent.text = str(flt(tax_rate, 2))
+			tax_percent = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}Percent")
+			tax_percent.text = str(flt(tax_rate, 2))
 
-				# Tax scheme
-				tax_scheme = ET.SubElement(tax_category, f"{{{self.namespaces['cac']}}}TaxScheme")
-				scheme_id = ET.SubElement(tax_scheme, f"{{{self.namespaces['cbc']}}}ID")
-				scheme_id.text = "VAT"
+			tax_scheme = ET.SubElement(tax_category, f"{{{self.namespaces['cac']}}}TaxScheme")
+			scheme_id = ET.SubElement(tax_scheme, f"{{{self.namespaces['cbc']}}}ID")
+			scheme_id.text = "VAT"
 
 		# Handle document-level charges (AllowanceCharge with ChargeIndicator=true)
 		for tax in self.invoice.taxes:
@@ -754,28 +783,29 @@ class PEPPOLGenerator:
 					reason.text = tax.description
 
 				# Amount
+				charge_amt = (
+					abs(flt(tax.tax_amount, 2))
+					if self.document_type == "CreditNote"
+					else flt(tax.tax_amount, 2)
+				)
 				amount = ET.SubElement(allowance_charge, f"{{{self.namespaces['cbc']}}}Amount")
-				amount.text = str(flt(tax.tax_amount, 2))
+				amount.text = f"{charge_amt:.2f}"
 				amount.set("currencyID", self.invoice.currency)
 
-				# Tax Category (if applicable)
-				if tax.rate and tax.rate > 0:
-					tax_category = ET.SubElement(allowance_charge, f"{{{self.namespaces['cac']}}}TaxCategory")
+				# Tax Category (BR-32: always required on AllowanceCharge)
+				tax_category = ET.SubElement(allowance_charge, f"{{{self.namespaces['cac']}}}TaxCategory")
 
-					# Get category code dynamically
-					category_code = self.get_vat_category_code(self.invoice, tax=tax)
+				category_code = self.get_vat_category_code(self.invoice, tax=tax)
 
-					# Category ID
-					category_id = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}ID")
-					category_id.text = category_code
+				category_id = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}ID")
+				category_id.text = category_code
 
-					tax_percent = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}Percent")
-					tax_percent.text = str(flt(tax.rate, 2))
+				tax_percent = ET.SubElement(tax_category, f"{{{self.namespaces['cbc']}}}Percent")
+				tax_percent.text = str(flt(tax.rate or 0, 2))
 
-					# Tax scheme
-					tax_scheme = ET.SubElement(tax_category, f"{{{self.namespaces['cac']}}}TaxScheme")
-					scheme_id = ET.SubElement(tax_scheme, f"{{{self.namespaces['cbc']}}}ID")
-					scheme_id.text = "VAT"
+				tax_scheme = ET.SubElement(tax_category, f"{{{self.namespaces['cac']}}}TaxScheme")
+				scheme_id = ET.SubElement(tax_scheme, f"{{{self.namespaces['cbc']}}}ID")
+				scheme_id.text = "VAT"
 
 	def _set_totals(self):
 		# Set monetary totals using ERPNext values directly
@@ -785,36 +815,46 @@ class PEPPOLGenerator:
 		# Add LegalMonetaryTotal section
 		legal_total = ET.SubElement(self.root, f"{{{self.namespaces['cac']}}}LegalMonetaryTotal")
 
+		# For credit notes, ERPNext stores negative totals but PEPPOL requires positive values
+		is_credit = self.document_type == "CreditNote"
+		inv_total = abs(flt(self.invoice.total, 2)) if is_credit else flt(self.invoice.total, 2)
+		inv_net_total = abs(flt(self.invoice.net_total, 2)) if is_credit else flt(self.invoice.net_total, 2)
+		inv_grand_total = (
+			abs(flt(self.invoice.grand_total, 2)) if is_credit else flt(self.invoice.grand_total, 2)
+		)
+
 		# Line Extension Amount (BT-106) - Sum of Invoice line net amount (BEFORE discount)
 		# Use invoice.total which is the sum of all item.amount values
 		line_total = ET.SubElement(legal_total, f"{{{self.namespaces['cbc']}}}LineExtensionAmount")
-		line_total.text = str(flt(self.invoice.total, 2))
+		line_total.text = f"{inv_total:.2f}"
 		line_total.set("currencyID", self.invoice.currency)
 
 		# Tax Exclusive Amount (BT-109) - Invoice total amount without VAT
 		# This equals LineExtensionAmount - AllowanceTotalAmount = net_total (after discount, before tax)
 		tax_exclusive_amount = ET.SubElement(legal_total, f"{{{self.namespaces['cbc']}}}TaxExclusiveAmount")
-		tax_exclusive_amount.text = str(flt(self.invoice.net_total, 2))
+		tax_exclusive_amount.text = f"{inv_net_total:.2f}"
 		tax_exclusive_amount.set("currencyID", self.invoice.currency)
 
 		# Tax Inclusive Amount (BT-112) - Invoice total amount with VAT
 		tax_inclusive_amount = ET.SubElement(legal_total, f"{{{self.namespaces['cbc']}}}TaxInclusiveAmount")
-		tax_inclusive_amount.text = str(flt(self.invoice.grand_total, 2))
+		tax_inclusive_amount.text = f"{inv_grand_total:.2f}"
 		tax_inclusive_amount.set("currencyID", self.invoice.currency)
 
 		# Allowance Total Amount (BT-107) - Sum of allowances on document level (discount)
 		# Calculate as difference between total (before discount) and net_total (after discount)
-		allowance_amount = flt(self.invoice.total, 2) - flt(self.invoice.net_total, 2)
+		allowance_amount = inv_total - inv_net_total
 		allowance_total = ET.SubElement(legal_total, f"{{{self.namespaces['cbc']}}}AllowanceTotalAmount")
-		allowance_total.text = str(flt(allowance_amount, 2))
+		allowance_total.text = f"{flt(allowance_amount, 2):.2f}"
 		allowance_total.set("currencyID", self.invoice.currency)
 
 		# Charge Total Amount (BT-108) - Sum of charges on document level
 		# Must come AFTER AllowanceTotalAmount per XSD schema order
 		actual_charge_total = sum(tax.tax_amount for tax in self.invoice.taxes if tax.charge_type == "Actual")
+		if is_credit:
+			actual_charge_total = abs(actual_charge_total)
 		if actual_charge_total:
 			charge_total = ET.SubElement(legal_total, f"{{{self.namespaces['cbc']}}}ChargeTotalAmount")
-			charge_total.text = str(flt(actual_charge_total, 2))
+			charge_total.text = f"{flt(actual_charge_total, 2):.2f}"
 			charge_total.set("currencyID", self.invoice.currency)
 		else:
 			# Always add ChargeTotalAmount (set to 0.00 if no charges)
@@ -825,24 +865,22 @@ class PEPPOLGenerator:
 		# Prepaid Amount (BT-113) - Sum of amounts already paid
 		# This is required when PayableAmount != TaxInclusiveAmount to satisfy BR-CO-16:
 		# PayableAmount = TaxInclusiveAmount - PrepaidAmount + RoundingAmount
-		if self.document_type != "CreditNote":
+		if not is_credit:
 			prepaid_value = flt(self.invoice.grand_total, 2) - flt(self.invoice.outstanding_amount, 2)
 			if prepaid_value > 0:
 				prepaid_amount = ET.SubElement(legal_total, f"{{{self.namespaces['cbc']}}}PrepaidAmount")
-				prepaid_amount.text = str(flt(prepaid_value, 2))
+				prepaid_amount.text = f"{flt(prepaid_value, 2):.2f}"
 				prepaid_amount.set("currencyID", self.invoice.currency)
 
 		# Payable Amount (BT-115) - Amount due for payment
-		# For credit notes, this should be negative (amount to be credited)
 		payable_amount = ET.SubElement(legal_total, f"{{{self.namespaces['cbc']}}}PayableAmount")
-		if self.document_type == "CreditNote":
-			# For credit notes, PayableAmount should be negative (the amount to be credited)
-			# Use grand_total (which is already negative for credit notes)
-			payable_value = flt(self.invoice.grand_total, 2)
+		if is_credit:
+			# For credit notes, use positive grand_total (amount to be credited)
+			payable_value = inv_grand_total
 		else:
 			# For invoices, use outstanding_amount
 			payable_value = flt(self.invoice.outstanding_amount, 2)
-		payable_amount.text = str(payable_value)
+		payable_amount.text = f"{payable_value:.2f}"
 		payable_amount.set("currencyID", self.invoice.currency)
 
 	def initialize_peppol_xml(self) -> ET.Element:
@@ -960,11 +998,30 @@ class PEPPOLGenerator:
 			if hasattr(invoice, "is_return") and invoice.is_return:
 				invoice_type_code = "381"
 			elif hasattr(invoice, "amended_from") and invoice.amended_from:
-				invoice_type_code = "384"
+				# 384 (Corrected Invoice) only allowed when both parties are German
+				if self._both_parties_german():
+					invoice_type_code = "384"
 		except Exception:
 			pass
 
 		return invoice_type_code
+
+	def _both_parties_german(self) -> bool:
+		# Check if both seller and buyer are German organizations
+		try:
+			seller_code = ""
+			if self.seller_address and self.seller_address.country:
+				seller_code = (
+					frappe.db.get_value("Country", self.seller_address.country, "code") or ""
+				).upper()
+			buyer_code = ""
+			if self.buyer_address and self.buyer_address.country:
+				buyer_code = (
+					frappe.db.get_value("Country", self.buyer_address.country, "code") or ""
+				).upper()
+			return seller_code == "DE" and buyer_code == "DE"
+		except Exception:
+			return False
 
 	def map_unit_code(self, erpnext_unit: str) -> str:
 		# Map ERPNext unit codes to PEPPOL standard unit codes using CommonCodeRetriever

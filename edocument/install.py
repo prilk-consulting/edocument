@@ -125,6 +125,7 @@ def get_custom_fields():
 				"options": "EDocument",
 				"insert_after": "edocument_profile",
 				"read_only": 1,
+				"no_copy": 1,
 			},
 			{
 				"fieldname": "edocument_status",
@@ -133,6 +134,7 @@ def get_custom_fields():
 				"insert_after": "edocument",
 				"fetch_from": "edocument.status",
 				"read_only": 1,
+				"no_copy": 1,
 			},
 		],
 		"Purchase Invoice": [
@@ -149,6 +151,7 @@ def get_custom_fields():
 				"options": "EDocument",
 				"insert_after": "edocument_tab",
 				"read_only": 1,
+				"no_copy": 1,
 			},
 			{
 				"fieldname": "edocument_status",
@@ -157,6 +160,7 @@ def get_custom_fields():
 				"insert_after": "edocument",
 				"fetch_from": "edocument.status",
 				"read_only": 1,
+				"no_copy": 1,
 			},
 		],
 	}

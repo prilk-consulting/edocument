@@ -120,6 +120,9 @@ class EDocument(Document):
 		Note: This method only generates XML - validation is handled separately.
 		This is the public method called from the button.
 		"""
+		if self.status == "Transmission Successful":
+			frappe.throw(_("Cannot regenerate XML for an already transmitted document."))
+
 		try:
 			file_name = self._generate_xml_internal()
 			# Save the document to persist status and error field changes
@@ -219,6 +222,9 @@ class EDocument(Document):
 		Updates the status and error fields based on validation results.
 		This is the public method called from the button.
 		"""
+		if self.status == "Transmission Successful":
+			frappe.throw(_("Cannot re-validate an already transmitted document."))
+
 		try:
 			self._validate_xml_internal()
 			# Save the document to persist status and error field changes
@@ -271,16 +277,16 @@ class EDocument(Document):
 				)
 
 		# Auto-detect EDocument fields (company, etc.) from XML using profile-specific detector
-		if self.edocument_profile and has_xml and not self.company:
+		if self.edocument_profile and has_xml:
 			try:
 				xml_bytes = self._get_xml_from_attached_files()
 				if xml_bytes:
 					from edocument.edocument.detector import get_edocument_fields
 
 					detected_fields = get_edocument_fields(xml_bytes, self.edocument_profile)
-					# Set detected fields on the document
+					# Set detected fields — override defaults from Frappe
 					for field, value in detected_fields.items():
-						if hasattr(self, field) and not getattr(self, field):
+						if hasattr(self, field) and value:
 							setattr(self, field, value)
 			except Exception as e:
 				frappe.log_error(
@@ -301,7 +307,17 @@ class EDocument(Document):
 						f"Error during automatic XML generation for EDocument {self.name}: {error_msg}"
 					)
 
-		if self.edocument_profile:
+		# Don't overwrite status for documents that reached a terminal state
+		# (already transmitted or matched) — re-validation would reset status
+		# back to "Validation Successful" and re-enable the Send button.
+		terminal_statuses = (
+			"Transmission Successful",
+			"Transmission Failed",
+			"Matching Successful",
+			"Matching Failed",
+		)
+
+		if self.edocument_profile and self.status not in terminal_statuses:
 			# Validate XML automatically
 			try:
 				self._validate_xml_internal()
@@ -347,16 +363,16 @@ class EDocument(Document):
 				)
 
 		# Auto-detect EDocument fields (company, etc.) from XML using profile-specific detector
-		if self.edocument_profile and has_xml and not self.company:
+		if self.edocument_profile and has_xml:
 			try:
 				xml_bytes = self._get_xml_from_attached_files()
 				if xml_bytes:
 					from edocument.edocument.detector import get_edocument_fields
 
 					detected_fields = get_edocument_fields(xml_bytes, self.edocument_profile)
-					# Update detected fields directly in database
+					# Update detected fields — override defaults from Frappe
 					for field, value in detected_fields.items():
-						if hasattr(self, field) and not getattr(self, field):
+						if hasattr(self, field) and value:
 							self.db_set(field, value, update_modified=False)
 			except Exception as e:
 				frappe.log_error(
