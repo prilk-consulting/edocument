@@ -8,8 +8,10 @@ frappe.ui.form.on("EDocument", {
 });
 
 function setup_action_buttons(frm) {
-	// Generate XML - for outgoing documents
-	if (frm.doc.edocument_source_document && frm.doc.edocument_profile) {
+	const is_transmitted = frm.doc.status === "Transmission Successful";
+
+	// Generate XML - for outgoing documents (not already transmitted)
+	if (frm.doc.edocument_source_document && frm.doc.edocument_profile && !is_transmitted) {
 		frm.add_custom_button(
 			__("Generate XML"),
 			() => {
@@ -35,7 +37,11 @@ function setup_action_buttons(frm) {
 			if (!r.message && !frm.doc.xml_file) return;
 
 			frm.add_custom_button(__("Preview EDocument"), () => show_preview(frm), __("Actions"));
-			frm.add_custom_button(__("Validate XML"), () => validate_xml(frm), __("Actions"));
+
+			if (!is_transmitted) {
+				frm.add_custom_button(__("Validate XML"), () => validate_xml(frm), __("Actions"));
+			}
+
 			frm.add_custom_button(__("Match Document"), () => match_document(frm), __("Actions"));
 			frm.add_custom_button(
 				__("Create Document"),
@@ -62,15 +68,16 @@ function show_preview(frm) {
 		freeze_message: __("Generating preview..."),
 		callback: (r) => {
 			if (!r.message) return;
-			frm.get_field("edocument_preview")?.set_value(r.message);
-			frm.get_field("edocument_preview")?.$wrapper?.css({
-				width: "100%",
-				padding: "15px",
-				background: "#fff",
-				border: "1px solid #e0e0e0",
-				borderRadius: "4px",
-				marginTop: "10px",
-			});
+			const field = frm.get_field("edocument_preview");
+			if (!field) return;
+
+			// Render preview in an iframe to isolate its CSS from ERPNext
+			const iframe = `<iframe srcdoc="${r.message.replace(/"/g, "&quot;")}"
+				style="width:100%;height:600px;border:1px solid #e0e0e0;border-radius:4px;background:#fff;"
+				frameborder="0">
+			</iframe>`;
+			field.set_value(iframe);
+			field.$wrapper?.css({ width: "100%", marginTop: "10px" });
 		},
 	});
 }
@@ -135,6 +142,7 @@ function show_matching_dialog(frm, matching_data, config) {
 function save_matching(frm, dialog, original_data) {
 	const data = JSON.parse(JSON.stringify(original_data));
 	const values = dialog.get_values();
+	if (!values) return; // Validation failed
 
 	// Update supplier
 	if (data.supplier) {

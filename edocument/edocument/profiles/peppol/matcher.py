@@ -530,7 +530,6 @@ def _get_dialog_config(matching_data: dict) -> dict:
 				"fieldname": "purchase_order",
 				"label": _("Match to Purchase Order"),
 				"options": "Purchase Order",
-				"reqd": 1,
 				"default": po_data.get("matched"),
 			}
 		)

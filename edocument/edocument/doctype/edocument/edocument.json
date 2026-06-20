@@ -65,7 +65,8 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
-   "options": "\nValidation Successful\nValidation Failed\nMatching Successful\nMatching Failed\nTransmission Successful\nTransmission Failed"
+   "options": "\nValidation Successful\nValidation Failed\nMatching Successful\nMatching Failed\nTransmission Successful\nTransmission Failed",
+   "read_only": 1
   },
   {
    "fieldname": "country",
