@@ -409,11 +409,48 @@ class PEPPOLGenerator:
 				frappe.db.get_value("Country", delivery_address.country, "code") or "DE"
 			).upper()
 
+	def _line_extension_amounts(self) -> dict:
+		"""Per-line net amounts (BT-131), rounded to 2 decimals and adjusted so they sum
+		exactly to the document LineExtensionAmount (BT-106), keyed by item.idx.
+
+		EN16931 BR-CO-10 requires the sum of BT-131 to equal BT-106 with no tolerance. Rounding
+		each line on its own breaks that when lines carry sub-cent (3-decimal) amounts, because
+		the sum of the rounded lines need not equal the rounded document total. We keep the
+		document total authoritative and hand the at-most-one-cent-per-line residual to the lines
+		that lost the most precision (largest-remainder method). Each line moves by at most a cent,
+		well inside PEPPOL-EN16931-R120's +/-0.02 quantity x price tolerance."""
+		is_credit = self.document_type == "CreditNote"
+		target = abs(flt(self.invoice.total, 2)) if is_credit else flt(self.invoice.total, 2)
+		target_cents = round(target * 100)
+
+		exact = {}
+		line_cents = {}
+		for item in self.invoice.items:
+			amount = flt(item.amount, item.precision("amount"))
+			if is_credit:
+				amount = abs(amount)
+			exact[item.idx] = amount
+			line_cents[item.idx] = round(flt(amount, 2) * 100)
+
+		residual = target_cents - sum(line_cents.values())
+		if residual:
+			# +1 cent to the lines rounded down the most, -1 to those rounded up the most.
+			step = 1 if residual > 0 else -1
+			by_remainder = sorted(
+				exact, key=lambda idx: step * (exact[idx] - line_cents[idx] / 100), reverse=True
+			)
+			for idx in by_remainder[: abs(residual)]:
+				line_cents[idx] += step
+
+		return {idx: cents / 100 for idx, cents in line_cents.items()}
+
 	def _add_line_items(self):
 		# Add invoice line items
 		if not hasattr(self, "root") or self.root is None:
 			return
 
+		# Reconcile per-line amounts up front so their sum matches the document BT-106 (BR-CO-10).
+		self._line_amounts = self._line_extension_amounts()
 		for item in self.invoice.items:
 			self._add_line_item(self.root, item)
 
@@ -452,10 +489,12 @@ class PEPPOLGenerator:
 		invoice_line = line_elem
 
 		line_amount = ET.SubElement(invoice_line, f"{{{self.namespaces['cbc']}}}LineExtensionAmount")
-		# Round through flt (the site's configured rounding), not f"{x:.2f}", so the line amount
-		# matches the document LineExtensionAmount (BT-106), which is also flt-rounded — otherwise
-		# the two disagree and BR-CO-10 fails on sub-cent (3-decimal) amounts.
-		line_amount.text = f"{flt(item_amount, 2):.2f}"
+		# Use the reconciled per-line amount (see _line_extension_amounts): rounded to 2 decimals
+		# and adjusted so the line amounts sum to the document LineExtensionAmount BT-106 (BR-CO-10),
+		# which plain per-line rounding breaks on sub-cent (3-decimal) amounts. Fall back to a direct
+		# flt round if the map is absent (e.g. a line emitted outside _add_line_items).
+		reconciled = getattr(self, "_line_amounts", {})
+		line_amount.text = f"{reconciled.get(item.idx, flt(item_amount, 2)):.2f}"
 		line_amount.set("currencyID", self.invoice.currency)
 
 		item_elem = ET.SubElement(invoice_line, f"{{{self.namespaces['cac']}}}Item")
