@@ -1,6 +1,8 @@
 # Copyright (c) 2025, Prilk Consulting BV and Contributors
 # See license.txt
 
+from types import SimpleNamespace
+
 import frappe
 from frappe.utils.data import flt
 from lxml import etree as ET
@@ -154,3 +156,76 @@ class TestLegalMonetaryTotals(TestCase):
 		tags = [ET.QName(child).localname for child in legal_total]
 		self.assertLess(tags.index("PrepaidAmount"), tags.index("PayableRoundingAmount"))
 		self.assertLess(tags.index("PayableRoundingAmount"), tags.index("PayableAmount"))
+
+
+class _Item:
+	"""Minimal stand-in for a Sales Invoice Item row: _line_extension_amounts only
+	reads amount, idx, and precision()."""
+
+	def __init__(self, idx, amount, precision=3):
+		self.idx = idx
+		self.amount = amount
+		self._precision = precision
+
+	def precision(self, fieldname):
+		return self._precision
+
+
+def _line_amounts(items, total, document_type="Invoice"):
+	generator = PEPPOLGenerator.__new__(PEPPOLGenerator)
+	# SimpleNamespace, not frappe._dict: a _dict's `items` attribute resolves to the built-in
+	# dict.items method, shadowing the line list (a real Sales Invoice is a Document, not a dict).
+	generator.invoice = SimpleNamespace(total=total, items=items)
+	generator.document_type = document_type
+	return generator._line_extension_amounts()
+
+
+class TestLineExtensionReconciliation(TestCase):
+	"""The sum of the per-line LineExtensionAmount (BT-131) must equal the document
+	LineExtensionAmount (BT-106) with no tolerance (BR-CO-10). On sub-cent (3-decimal)
+	lines, rounding each line on its own breaks that; the residual is spread across the
+	lines, each moving at most a cent (within PEPPOL-EN16931-R120's +/-0.02 tolerance)."""
+
+	def _assert_reconciles(self, items, total, *, document_type="Invoice"):
+		amounts = _line_amounts(items, total, document_type)
+		expected_total = abs(flt(total, 2)) if document_type == "CreditNote" else flt(total, 2)
+		# BR-CO-10: the rounded sum of the lines equals the document total.
+		self.assertEqual(flt(sum(amounts.values()), 2), expected_total)
+		# PEPPOL-EN16931-R120: each emitted line stays within 0.02 of its true amount.
+		for item in items:
+			true_amount = abs(item.amount) if document_type == "CreditNote" else item.amount
+			self.assertLessEqual(abs(amounts[item.idx] - true_amount), 0.02)
+		return amounts
+
+	def test_two_subcent_lines(self):
+		# 10.006 + 10.006: each rounds to 10.01 (sum 20.02) but the document total is 20.01,
+		# so one line is nudged down a cent.
+		amounts = self._assert_reconciles([_Item(1, 10.006), _Item(2, 10.006)], 20.012)
+		self.assertEqual(sorted(amounts.values()), [10.00, 10.01])
+
+	def test_three_subcent_lines(self):
+		# 3 x 10.004: each rounds to 10.00 (sum 30.00) but the document total is 30.01,
+		# so one line gains a cent.
+		amounts = self._assert_reconciles([_Item(1, 10.004), _Item(2, 10.004), _Item(3, 10.004)], 30.012)
+		self.assertEqual(sorted(amounts.values()), [10.00, 10.00, 10.01])
+
+	def test_plain_two_decimal_lines_unchanged(self):
+		# No sub-cent amounts: nothing to redistribute.
+		amounts = self._assert_reconciles([_Item(1, 10.00, precision=2), _Item(2, 20.00, precision=2)], 30.00)
+		self.assertEqual(amounts, {1: 10.00, 2: 20.00})
+
+	def test_single_subcent_line_unaffected(self):
+		# A lone line already reconciles: round-of-sum is round-of-itself.
+		amounts = self._assert_reconciles([_Item(1, 607.025)], 607.025)
+		self.assertEqual(amounts, {1: flt(607.025, 2)})
+
+	def test_credit_note_lines_use_absolute_values(self):
+		amounts = self._assert_reconciles(
+			[_Item(1, -10.006), _Item(2, -10.006)], -20.012, document_type="CreditNote"
+		)
+		self.assertEqual(sorted(amounts.values()), [10.00, 10.01])
+
+	def test_deduction_line_keeps_sign(self):
+		# An invoice deduction line (negative amount) keeps its sign and still reconciles.
+		amounts = self._assert_reconciles([_Item(1, 100.005), _Item(2, -10.005)], 90.00)
+		self.assertLess(amounts[2], 0)
