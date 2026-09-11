@@ -47,7 +47,7 @@ bench --site your-site install-app edocument
 This app requires the following Python packages (automatically installed):
 
 - **saxonche** (~=12.5.0): XSLT 3.0 processor for Schematron validation and HTML preview
-- **lxml** (>=4.9.3,<6.0.0): XML parsing, XSD validation, and XSLT processing
+- **lxml** (>=6.1.0,<7.0.0): XML parsing, XSD validation, and XSLT processing
 
 These dependencies are specified in `pyproject.toml` and will be installed automatically when you install the app.
 
