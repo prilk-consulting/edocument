@@ -53,7 +53,7 @@ def _detect_profile_from_xml(xml_bytes: bytes) -> str | None:
 
 class EDocument(Document):
 	@frappe.whitelist()
-	def _has_xml_file(self) -> bool:
+	def has_xml_file(self) -> bool:
 		"""Check if XML file is attached to this EDocument."""
 		xml_files = frappe.get_all(
 			"File",
@@ -247,14 +247,14 @@ class EDocument(Document):
 		# - Incoming: if XML file exists but no source document (uploaded/received XML)
 		if self.edocument_source_document:
 			self.direction = "Outgoing"
-		elif self.xml_file or self._has_xml_file():
+		elif self.xml_file or self.has_xml_file():
 			self.direction = "Incoming"
 		# If neither condition is met, keep existing value or default to "Outgoing"
 		elif not self.direction:
 			self.direction = "Outgoing"
 
 		# Check if XML is available (either via xml_file field or attached files)
-		has_xml = self.xml_file or self._has_xml_file()
+		has_xml = self.xml_file or self.has_xml_file()
 
 		# Auto-detect profile from XML if:
 		xml_file_changed = self.has_value_changed("xml_file")
@@ -296,7 +296,7 @@ class EDocument(Document):
 
 		if self.edocument_source_document and self.edocument_profile and not self.xml_file:
 			# Check if XML already exists (for generated XML)
-			if not self._has_xml_file():
+			if not self.has_xml_file():
 				# Generate XML automatically
 				try:
 					self._generate_xml_internal()
@@ -343,7 +343,7 @@ class EDocument(Document):
 		Detect profile and fields from XML if not detected in before_save (e.g., file attached separately).
 		"""
 		# Check if XML is available (either via xml_file field or attached files)
-		has_xml = self.xml_file or self._has_xml_file()
+		has_xml = self.xml_file or self.has_xml_file()
 
 		# Auto-detect profile from XML if:
 		xml_file_changed = self.has_value_changed("xml_file")
