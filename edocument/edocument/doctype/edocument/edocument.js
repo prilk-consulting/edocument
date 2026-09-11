@@ -31,7 +31,7 @@ function setup_action_buttons(frm) {
 	if (!frm.doc.edocument_profile) return;
 
 	frm.call({
-		method: "_has_xml_file",
+		method: "has_xml_file",
 		doc: frm.doc,
 		callback: (r) => {
 			if (!r.message && !frm.doc.xml_file) return;
