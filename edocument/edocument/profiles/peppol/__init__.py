@@ -19,10 +19,13 @@ PEPPOL_PROFILE_ID = "urn:fdc:peppol.eu:2017:poacc:billing:01:1.0"
 
 # UBL 2.1 Document Types
 # Maps invoice type codes to UBL document types
-# UNCL1001 codes: 380=Invoice, 381=Credit Note, 383=Debit Note, 384=Corrected Invoice
+# UNCL1001 codes: 326=Partial Invoice, 380=Invoice, 381=Credit Note, 383=Debit Note,
+# 384=Corrected Invoice, 386=Prepayment Invoice
 DOCUMENT_TYPE_MAPPING = {
+	"326": "Invoice",  # Partial invoice (still uses Invoice root)
 	"380": "Invoice",  # Commercial invoice
 	"384": "Invoice",  # Corrected invoice (still uses Invoice root)
+	"386": "Invoice",  # Prepayment invoice (still uses Invoice root)
 	"381": "CreditNote",  # Credit note
 	"383": "DebitNote",  # Debit note (for future support)
 }

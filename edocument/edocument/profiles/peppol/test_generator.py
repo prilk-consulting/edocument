@@ -12,7 +12,7 @@ try:
 except ImportError:
 	from frappe.tests.utils import FrappeTestCase as TestCase
 
-from edocument.edocument.profiles.peppol import UBL_NAMESPACES
+from edocument.edocument.profiles.peppol import DOCUMENT_TYPE_ELEMENTS, UBL_NAMESPACES
 from edocument.edocument.profiles.peppol.generator import PEPPOLGenerator
 
 CBC = UBL_NAMESPACES["cbc"]
@@ -156,6 +156,99 @@ class TestLegalMonetaryTotals(TestCase):
 		tags = [ET.QName(child).localname for child in legal_total]
 		self.assertLess(tags.index("PrepaidAmount"), tags.index("PayableRoundingAmount"))
 		self.assertLess(tags.index("PayableRoundingAmount"), tags.index("PayableAmount"))
+
+
+def _build_header(invoice, *, seller_country=None, buyer_country=None):
+	"""Run PEPPOLGenerator._set_header against a stand-in invoice and return the root element.
+	__init__ is bypassed because it loads related addresses/contacts from the database."""
+	generator = PEPPOLGenerator.__new__(PEPPOLGenerator)
+	generator.invoice = invoice
+	generator.seller_address = frappe._dict(country=seller_country) if seller_country else None
+	generator.buyer_address = frappe._dict(country=buyer_country) if buyer_country else None
+	generator.document_type = generator._get_document_type()
+	generator.document_elements = DOCUMENT_TYPE_ELEMENTS[generator.document_type]
+	generator.root = ET.Element("Root")
+	generator._set_header()
+	return generator.root
+
+
+class TestInvoiceTypeCode(TestCase):
+	"""BT-3 tells the buyer how to book the document. A prepayment invoice bills an advance
+	against an order that is not delivered yet, so it must carry 386 (Prepayment invoice)
+	rather than 380 (Commercial invoice), which claims a completed supply."""
+
+	def _invoice(self, **kwargs):
+		invoice = frappe._dict(
+			name="ACC-SINV-2026-00001",
+			posting_date="2026-09-09",
+			due_date="2026-10-09",
+			currency="EUR",
+			po_no=None,
+			is_return=0,
+			amended_from=None,
+			return_against=None,
+			is_down_payment_invoice=0,
+		)
+		invoice.update(kwargs)
+		return invoice
+
+	def _type_code(self, invoice, **kwargs):
+		root = _build_header(invoice, **kwargs)
+		element = root.find(f"{{{CBC}}}InvoiceTypeCode")
+		if element is None:
+			element = root.find(f"{{{CBC}}}CreditNoteTypeCode")
+		return element.text
+
+	def test_down_payment_invoice_is_prepayment(self):
+		self.assertEqual(self._type_code(self._invoice(is_down_payment_invoice=1)), "386")
+
+	def test_ordinary_invoice_is_commercial(self):
+		self.assertEqual(self._type_code(self._invoice()), "380")
+
+	def test_down_payment_return_stays_a_credit_note(self):
+		# Refunding an advance is still a credit note; 381 wins over 386.
+		self.assertEqual(self._type_code(self._invoice(is_down_payment_invoice=1, is_return=1)), "381")
+
+	def test_german_down_payment_is_a_partial_invoice(self):
+		# DE-R-017 warns on any code outside XRechnung's set, which excludes 386; 326 is the
+		# advance code it accepts, and PEPPOL-EN16931-P0112 only allows it between DE parties.
+		self.assertEqual(
+			self._type_code(
+				self._invoice(is_down_payment_invoice=1),
+				seller_country="Germany",
+				buyer_country="Germany",
+			),
+			"326",
+		)
+
+	def test_half_german_down_payment_is_a_prepayment(self):
+		# 326 is fatal unless both parties are German (PEPPOL-EN16931-P0112).
+		self.assertEqual(
+			self._type_code(
+				self._invoice(is_down_payment_invoice=1),
+				seller_country="Germany",
+				buyer_country="France",
+			),
+			"386",
+		)
+
+	def test_amended_down_payment_keeps_the_advance_code(self):
+		# 384 (Corrected invoice) would hide that the document bills an advance, and it
+		# carries no reference to what it corrects, so the advance code wins.
+		self.assertEqual(
+			self._type_code(
+				self._invoice(is_down_payment_invoice=1, amended_from="ACC-SINV-2026-00001-1"),
+				seller_country="Germany",
+				buyer_country="Germany",
+			),
+			"326",
+		)
+
+	def test_prepayment_invoice_uses_the_invoice_document_type(self):
+		# 386 must stay on the UBL Invoice root, not fall through to a CreditNote.
+		root = _build_header(self._invoice(is_down_payment_invoice=1))
+		self.assertIsNotNone(root.find(f"{{{CBC}}}InvoiceTypeCode"))
+		self.assertIsNotNone(root.find(f"{{{CBC}}}DueDate"))
 
 
 class _Item:

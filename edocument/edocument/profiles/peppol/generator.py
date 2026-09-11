@@ -1061,6 +1061,11 @@ class PEPPOLGenerator:
 		try:
 			if hasattr(invoice, "is_return") and invoice.is_return:
 				invoice_type_code = "381"
+			elif invoice.get("is_down_payment_invoice"):
+				# Nothing is delivered yet, so the buyer must not book the document as a
+				# completed supply. 386 (Prepayment invoice) says so everywhere; German
+				# invoices need 326 (Partial invoice), the only advance code DE-R-017 accepts.
+				invoice_type_code = "326" if self._both_parties_german() else "386"
 			elif hasattr(invoice, "amended_from") and invoice.amended_from:
 				# 384 (Corrected Invoice) only allowed when both parties are German
 				if self._both_parties_german():
