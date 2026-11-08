@@ -23,7 +23,11 @@ def preview_peppol_xml(xml_bytes, edocument_profile):
 	Returns:
 		str: HTML string for preview
 	"""
-	xml_string = xml_bytes.decode("utf-8") if isinstance(xml_bytes, bytes) else xml_bytes
+	from edocument.edocument.validator import reject_doctype
+
+	xml_bytes = xml_bytes.encode("utf-8") if isinstance(xml_bytes, str) else xml_bytes
+	reject_doctype(xml_bytes)
+	xml_string = xml_bytes.decode("utf-8")
 
 	# Get official PEPPOL stylesheet path
 	xslt_path = _get_peppol_stylesheet_path()

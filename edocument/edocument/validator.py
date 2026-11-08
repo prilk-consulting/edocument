@@ -132,6 +132,15 @@ def validate_xml_against_xsd_file(xml_bytes: bytes, xsd_file_path: Path | str) -
 		raise ValueError(error_msg)
 
 
+def reject_doctype(xml_bytes: bytes) -> None:
+	"""Refuse XML with a DOCTYPE, since Saxon resolves external entities such as local files."""
+	from lxml import etree
+
+	parser = etree.XMLParser(resolve_entities=False, no_network=True, load_dtd=False)
+	if etree.fromstring(xml_bytes, parser).getroottree().docinfo.doctype:
+		frappe.throw(_("XML with a DOCTYPE declaration is not allowed."))
+
+
 def validate_xml_against_schematron_file(
 	xml_bytes: bytes, xsl_file_path: Path | str
 ) -> tuple[list[str], list[str]]:
@@ -151,6 +160,7 @@ def validate_xml_against_schematron_file(
 	except ImportError:
 		raise ImportError("saxonche package is required for Schematron validation")
 
+	reject_doctype(xml_bytes)
 	xml_string = xml_bytes.decode("utf-8")
 
 	# Run Schematron validation

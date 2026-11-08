@@ -103,7 +103,7 @@ class EDocument(Document):
 				"attached_to_name": self.name,
 				"folder": "Home/Attachments",
 				"content": xml_bytes,
-				"is_private": 0,
+				"is_private": 1,
 			}
 		)
 		file_doc.insert(ignore_permissions=True)
@@ -627,7 +627,7 @@ class EDocument(Document):
 
 
 @frappe.whitelist()
-def create_document(source_name, target_doc=None):
+def create_document(source_name: str, target_doc: dict | str | None = None):
 	"""
 	Parse XML from EDocument and create a document (e.g., Purchase Invoice).
 	Used by both:
@@ -641,8 +641,8 @@ def create_document(source_name, target_doc=None):
 	Returns:
 		Document (not saved) - caller can save it or open it in UI
 	"""
-	# Get the EDocument instance
 	edocument = frappe.get_doc("EDocument", source_name)
+	edocument.check_permission("read")
 
 	if not edocument.edocument_profile:
 		frappe.throw(_("EDocument Profile is required to parse XML and create document."))

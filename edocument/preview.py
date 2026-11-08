@@ -12,7 +12,6 @@ import frappe
 from frappe import _
 
 
-@frappe.whitelist()
 def get_xml_preview(xml_bytes=None, edocument_profile=None):
 	"""
 	Get XML preview (HTML transformation) based on the profile.

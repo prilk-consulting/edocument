@@ -16,6 +16,7 @@ from lxml import etree
 @frappe.whitelist()
 def setup_peppol_codes():
 	"""Main function to set up PEPPOL code lists."""
+	frappe.only_for("System Manager")
 
 	frappe.logger().info("Starting PEPPOL code list setup...")
 
