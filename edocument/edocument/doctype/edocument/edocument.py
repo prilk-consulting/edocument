@@ -627,7 +627,7 @@ class EDocument(Document):
 
 
 @frappe.whitelist()
-def create_document(source_name, target_doc=None):
+def create_document(source_name: str, target_doc: dict | str | None = None):
 	"""
 	Parse XML from EDocument and create a document (e.g., Purchase Invoice).
 	Used by both:

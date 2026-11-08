@@ -80,6 +80,8 @@ jobs:
         run: |
           sudo apt update
           sudo apt-get install mariadb-client libxml2-dev libxslt-dev
+          # The CI database has no TLS; newer MariaDB clients require it by default
+          printf '[client]\nskip-ssl\n' > ~/.my.cnf
 
       - name: Setup
         run: |
